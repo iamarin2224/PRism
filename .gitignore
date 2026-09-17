@@ -1,0 +1,194 @@
+# ============================================================
+# OS / Editor
+# ============================================================
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================================================
+# Environment / Secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+# ============================================================
+# Node.js / React
+# ============================================================
+
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+
+# Vite
+.vite/
+
+# React / Next.js (in case we use Next later)
+.next/
+out/
+
+# Parcel
+.parcel-cache/
+
+# Turbo
+.turbo/
+
+# Misc
+*.tsbuildinfo
+
+# ============================================================
+# Python / FastAPI
+# ============================================================
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Wheel
+*.whl
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Pylint
+.pylint.d/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python logs
+*.log
+
+# ============================================================
+# AI / ML Artifacts
+# ============================================================
+
+# Local vector databases / indexes
+.chroma/
+chroma_db/
+vectorstore/
+vector_store/
+
+# Local embeddings / model caches
+models/
+model_cache/
+huggingface_cache/
+
+# Generated AI outputs
+ai_outputs/
+evaluation_results/
+
+# ============================================================
+# Database / Local Development
+# ============================================================
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Local database directories
+data/
+database/
+
+# ============================================================
+# Temporary / Generated Files
+# ============================================================
+
+tmp/
+temp/
+.cache/
+
+*.tmp
+*.bak
+
+# ============================================================
+# Secrets / Credentials
+# ============================================================
+
+*.pem
+*.key
+*.crt
+
+# GitHub App private keys
+*.private-key.pem
+
+# ============================================================
+# Logs
+# ============================================================
+
+logs/
+*.log
+
+# ============================================================
+# Local Configuration
+# ============================================================
+
+*.local
+
+# ============================================================
+# Others
+# ============================================================
+roadmap.md
