@@ -1,16 +1,68 @@
-# React + Vite
+# PRism — Frontend (`frontend/`)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The **Frontend** is a single-page web application built with **React 19** and **Vite**. It provides a developer testing console for Phase 1 to interact with the LLM service and inspect structured findings before building the full review dashboard.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Directory Structure
 
-## React Compiler
+```text
+frontend/
+├── src/
+│   ├── App.jsx        # Main application component & testing console
+│   ├── App.css        # Component styles
+│   ├── index.css      # Global styles & theme CSS variables
+│   ├── main.jsx       # React entrypoint
+│   └── assets/        # Static assets and icons
+├── public/            # Static public assets
+├── .env               # Local frontend environment variables (gitignored)
+├── .env.example       # Frontend environment template
+├── index.html         # HTML template
+├── package.json       # Dependencies & npm scripts
+└── vite.config.js     # Vite configuration
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Configuration & Environment Variables
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Copy `frontend/.env.example` to `frontend/.env`:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `VITE_API_URL` | `http://localhost:8080` | Base URL of the Node/Express backend gateway. |
+
+---
+
+## Features
+
+- **Prompt Console**: Interactive textarea allowing custom prompts for LLM evaluation.
+- **Text Testing**: Direct trigger for `POST /api/ai/test` to inspect raw model responses.
+- **Structured Findings Review**: Triggers `POST /api/ai/test-structured` and renders structured issue cards complete with:
+  - Severity Badges (`critical`, `high`, `medium`, `low`)
+  - Category Labels (`security`, `correctness`, `performance`, `error_handling`, `code_quality`)
+  - Code Line Numbers
+  - Summary Title and Detailed Descriptions
+- **Health Check**: One-click end-to-end connectivity check (`React -> Node -> FastAPI`).
+
+---
+
+## Running Locally
+
+```bash
+# Install dependencies
+npm install
+
+# Start Vite development server (with HMR)
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```

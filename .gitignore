@@ -132,7 +132,6 @@ vectorstore/
 vector_store/
 
 # Local embeddings / model caches
-models/
 model_cache/
 huggingface_cache/
 
