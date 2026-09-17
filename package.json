@@ -1,0 +1,13 @@
+{
+  "name": "prism",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PRism — Agentic Pull Request Review System",
+  "scripts": {
+    "dev": "./dev.sh",
+    "dev:ai": "cd ai && ([ -f .venv/bin/uvicorn ] && .venv/bin/uvicorn app.main:app --port 8000 --reload || uvicorn app.main:app --port 8000 --reload)",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "check": "curl -s http://localhost:8080/api/ai-health && echo ''"
+  }
+}
