@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const { handleGitHubWebhook } = require('./webhook');
 
 dotenv.config();
 
@@ -9,8 +10,14 @@ const PORT = process.env.PORT || 8080;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
-// Enable JSON body parsing
-app.use(express.json());
+// Enable JSON body parsing while preserving raw body for HMAC signature verification
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // Local development CORS configuration
 app.use(
@@ -24,6 +31,11 @@ app.use(
 // Root health check endpoint
 app.get('/', (req, res) => {
   res.json({ message: 'PRism backend is running' });
+});
+
+// GitHub Webhook endpoint
+app.post('/api/github/webhook', (req, res) => {
+  return handleGitHubWebhook(req, res, AI_SERVICE_URL);
 });
 
 // Proxy health check to AI service (FastAPI)

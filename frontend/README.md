@@ -1,6 +1,6 @@
 # PRism — Frontend (`frontend/`)
 
-The **Frontend** is a single-page web application built with **React 19** and **Vite**. It provides a developer testing console for Phase 1 to interact with the LLM service and inspect structured findings before building the full review dashboard.
+The **Frontend** is a single-page web application built with **React 19** and **Vite**. It serves as the developer testing console and future review dashboard.
 
 ---
 

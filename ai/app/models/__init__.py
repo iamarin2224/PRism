@@ -5,6 +5,11 @@ from app.models.review import (
     ReviewResponse,
     StructuredTestRequest,
 )
+from app.models.github import (
+    PREventPayload,
+    RepositoryInfo,
+    PullRequestInfo,
+)
 
 __all__ = [
     "ReviewRequest",
@@ -12,4 +17,7 @@ __all__ = [
     "Finding",
     "ReviewResponse",
     "StructuredTestRequest",
+    "PREventPayload",
+    "RepositoryInfo",
+    "PullRequestInfo",
 ]

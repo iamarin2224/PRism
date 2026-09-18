@@ -8,6 +8,7 @@ from app.models.review import (
     ReviewResponse,
     StructuredTestRequest,
 )
+from app.models.github import PREventPayload
 from app.services.llm import llm_service, SAMPLE_CODE_FOR_STRUCTURED_TEST
 
 app = FastAPI(title="PRism AI Service", version="0.1.0")
@@ -26,6 +27,24 @@ app.add_middleware(
 def read_root():
     """Health check root endpoint (Phase 0)."""
     return {"message": "PRism AI service is running"}
+
+
+@app.post("/api/github/pr-event")
+def receive_github_pr_event(event: PREventPayload):
+    """
+    Receive and validate pull request webhook event forwarded from the Node backend gateway.
+    (Phase 2 boundary endpoint: actual automated review pipeline will be triggered here in later phases).
+    """
+    repo_name = event.repository.fullName if event.repository else "unknown"
+    pr_num = event.pullRequest.number if event.pullRequest else "unknown"
+
+    return {
+        "status": "received",
+        "message": f"FastAPI received PR #{pr_num} ({event.action}) for {repo_name}",
+        "action": event.action,
+        "repo": repo_name,
+        "prNumber": pr_num,
+    }
 
 
 @app.post("/api/ai/test", response_model=LLMResponse)

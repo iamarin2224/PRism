@@ -1,6 +1,6 @@
 # PRism — AI Service (`ai/`)
 
-The **AI Service** is a Python service built with **FastAPI**, **Pydantic v2**, and the **OpenAI Python SDK**. It serves as the core intelligence engine for PRism, responsible for communicating with LLM providers (via OpenRouter), formatting prompts, parsing code, and generating strictly validated, structured findings.
+The **AI Service** is a Python service built with **FastAPI**, **Pydantic v2**, and the **OpenAI Python SDK**. It serves as the core intelligence engine for PRism, responsible for ingesting validated PR webhook events, communicating with LLM providers (via OpenRouter), formatting prompts, parsing code, and generating strictly validated, structured findings.
 
 ---
 
@@ -14,6 +14,7 @@ ai/
 │   ├── main.py                # FastAPI routes, middleware, and CORS configuration
 │   ├── models/                # Pydantic v2 schemas
 │   │   ├── __init__.py
+│   │   ├── github.py          # PREventPayload, RepositoryInfo, PullRequestInfo
 │   │   └── review.py          # Finding, ReviewResponse, ReviewRequest schemas
 │   └── services/              # Business logic & LLM communication
 │       ├── __init__.py
@@ -49,8 +50,7 @@ cp .env.example .env
 
 ## Pydantic Schemas
 
-Located in [`app/models/review.py`](file:///Users/arindas/Coding/Projects/PRism/ai/app/models/review.py):
-
+### Code Review Models ([`app/models/review.py`](file:///Users/arindas/Coding/Projects/PRism/ai/app/models/review.py))
 - **`ReviewRequest`**: Input payload for raw text prompts (`prompt: str`).
 - **`LLMResponse`**: Output model for raw text completions (`response: str`).
 - **`Finding`**: Individual code issue or observation:
@@ -62,51 +62,43 @@ Located in [`app/models/review.py`](file:///Users/arindas/Coding/Projects/PRism/
 - **`ReviewResponse`**: Container for structured findings (`findings: list[Finding]`).
 - **`StructuredTestRequest`**: Payload for structured analysis tests (`code: str | None`).
 
+### GitHub Event Models ([`app/models/github.py`](file:///Users/arindas/Coding/Projects/PRism/ai/app/models/github.py))
+- **`PREventPayload`**: Standardized PR webhook event payload forwarded from the Node backend:
+  - `deliveryId`: Unique delivery GUID string.
+  - `event`: Event type (`"pull_request"`).
+  - `action`: Action type (`"opened" | "synchronize" | "reopened"`).
+  - `repository`: `RepositoryInfo` (`name`, `fullName`, `owner`, `htmlUrl`).
+  - `pullRequest`: `PullRequestInfo` (`number`, `title`, `sourceBranch`, `targetBranch`, `author`, `state`).
+  - `sender`: Username string.
+  - `installationId`: Optional GitHub App installation ID.
+
 ---
 
 ## API Endpoints
 
 ### 1. `GET /`
-Health check endpoint.
+Root health check endpoint.
 - **Response:** `{"message": "PRism AI service is running"}`
 
-### 2. `POST /api/ai/test`
-Generates a raw text response from the configured OpenRouter model.
-- **Request:**
-  ```json
-  {
-    "prompt": "Explain what SQL injection is."
-  }
-  ```
+### 2. `POST /api/github/pr-event`
+Receives and validates normalized PR events forwarded from the Node.js backend gateway.
+- **Request Body:** `PREventPayload`
 - **Response:**
   ```json
   {
-    "response": "SQL injection is a security vulnerability..."
+    "status": "received",
+    "message": "FastAPI received PR #42 (opened) for octocat/PRism",
+    "action": "opened",
+    "repo": "octocat/PRism",
+    "prNumber": 42
   }
   ```
 
-### 3. `POST /api/ai/test-structured`
-Analyzes a code snippet and returns validated structured findings adhering to the `ReviewResponse` schema.
-- **Request:**
-  ```json
-  {
-    "code": "def query(user_id): return f'SELECT * FROM users WHERE id = {user_id}'"
-  }
-  ```
-- **Response:**
-  ```json
-  {
-    "findings": [
-      {
-        "severity": "high",
-        "category": "security",
-        "title": "SQL Injection Vulnerability",
-        "description": "Direct string interpolation in SQL queries allows untrusted input to manipulate the database query.",
-        "line": 1
-      }
-    ]
-  }
-  ```
+### 3. `POST /api/ai/test`
+Generates a raw text response from the configured OpenRouter model.
+
+### 4. `POST /api/ai/test-structured`
+Analyzes a code snippet and returns validated structured findings conforming to the `ReviewResponse` schema.
 
 ---
 

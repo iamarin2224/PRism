@@ -1,6 +1,6 @@
 # PRism — Backend Service (`backend/`)
 
-The **Backend Service** is a **Node.js + Express** server. It acts as the API Gateway, managing client requests, handling CORS, proxying requests to the AI service, and preparing for future GitHub App webhook events and database persistence.
+The **Backend Service** is a **Node.js + Express** server. It acts as the API Gateway, managing client requests, verifying incoming GitHub webhooks via HMAC-SHA256, handling CORS, proxying requests to the AI service, and preparing for automated review orchestration.
 
 ---
 
@@ -9,10 +9,13 @@ The **Backend Service** is a **Node.js + Express** server. It acts as the API Ga
 ```text
 backend/
 ├── src/
-│   └── index.js       # Express server, CORS configuration, and proxy routes
-├── .env               # Local environment variables (gitignored)
-├── .env.example       # Environment template
-└── package.json       # Dependencies & npm scripts
+│   ├── index.js           # Express server, CORS configuration, and route registrations
+│   └── webhook.js         # GitHub HMAC signature verification & PR event parsing
+├── scripts/
+│   └── test-webhook.js    # Comprehensive local webhook test suite (9 test cases)
+├── .env                   # Local environment variables (gitignored)
+├── .env.example           # Environment template
+└── package.json           # Dependencies & npm scripts
 ```
 
 ---
@@ -32,40 +35,52 @@ cp .env.example .env
 | `PORT` | `8080` | Port on which the Express server listens. |
 | `FRONTEND_URL` | `http://localhost:5173` | Allowed origin for CORS from the React frontend. |
 | `AI_SERVICE_URL` | `http://localhost:8000` | Base URL of the FastAPI AI Service. |
+| `GITHUB_WEBHOOK_SECRET` | `development_webhook_secret` | HMAC secret for verifying `X-Hub-Signature-256`. |
+
+---
+
+## GitHub Webhook Security & Processing
+
+### 1. Signature Verification (`X-Hub-Signature-256`)
+- GitHub generates an HMAC-SHA256 signature formatted as `sha256=<hex_hash>`.
+- The backend preserves the raw request buffer via `express.json({ verify: (req, res, buf) => { req.rawBody = buf; } })`.
+- Node's `crypto.timingSafeEqual` performs a constant-time comparison to prevent timing attacks.
+- Requests without a valid signature are rejected with **HTTP 401 Unauthorized** before any payload is trusted.
+
+### 2. Event Filtering
+- **Trigger Actions:** `opened`, `synchronize`, `reopened` on `X-GitHub-Event: pull_request`. These are normalized and forwarded to FastAPI (`POST /api/github/pr-event`).
+- **Ignored Actions:** Non-review actions (e.g. `closed`, `labeled`, `edited`) return **HTTP 200** with `status: "ignored"`.
+- **System Events:** `ping` events return **HTTP 200** with `status: "pong"`.
 
 ---
 
 ## API Endpoints
 
-### 1. `GET /`
+### 1. `POST /api/github/webhook`
+Primary webhook ingestion endpoint for GitHub.
+- **Headers:** `X-Hub-Signature-256`, `X-GitHub-Event`, `X-GitHub-Delivery`
+- **Responses:**
+  - `200 OK` — Valid event processed (`success`, `pong`, or `ignored`)
+  - `400 Bad Request` — Missing `X-GitHub-Event` header
+  - `401 Unauthorized` — Missing or invalid HMAC signature
+
+### 2. `GET /`
 Root health check endpoint.
-- **Response:** `{"message": "PRism backend is running"}`
 
-### 2. `GET /api/ai-health`
+### 3. `GET /api/ai-health`
 Proxies a health check request to the FastAPI AI service root (`GET /`).
-- **Response:** `{"message": "PRism AI service is running"}`
 
-### 3. `POST /api/ai/test`
-Forwards raw text prompt requests to FastAPI (`POST /api/ai/test`).
-- **Request Body:** `{"prompt": "string"}`
-- **Response:** `{"response": "string"}`
-
-### 4. `POST /api/ai/test-structured`
-Forwards structured code review test requests to FastAPI (`POST /api/ai/test-structured`).
-- **Request Body:** `{"code": "string"}` (optional)
-- **Response:** `{"findings": [...]}`
+### 4. `POST /api/ai/test` & `POST /api/ai/test-structured`
+Proxies developer LLM testing requests to FastAPI.
 
 ---
 
-## Running Locally
+## Running & Testing
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server with auto-reload (nodemon)
+# Start development server
 npm run dev
 
-# Or start in production mode
-npm start
+# Run the 9-case webhook test suite
+npm run test:webhook
 ```
