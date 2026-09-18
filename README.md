@@ -4,50 +4,67 @@ PRism is an intelligent, multi-stage agentic code review system designed to anal
 
 ---
 
-## Architecture Overview (Phase 2: GitHub Webhook Infrastructure)
+## Architecture Overview
 
 ```text
-[ GitHub PR Event ]           (e.g., opened, synchronize, reopened)
-        │
-        │ Webhook POST /api/github/webhook (HMAC-SHA256 Signed)
-        ▼
-[ Node / Express Backend ]    (Port 8080) — Webhook Verification & Event Parser
-        │
-        │ HTTP / JSON POST /api/github/pr-event (Internal)
-        ▼
-[ FastAPI AI Service ]        (Port 8000) — Event Ingestion & Schema Validation
-        │
-        ▼
-[ Review Pipeline ]           (Phase 3+: RAG, Tools & LLM Code Review)
+                         GitHub
+                           │
+                           │ Webhook POST /api/github/webhook (HMAC-SHA256 Signed)
+                           ▼
+                  ┌──────────────────┐
+                  │     Next.js      │ (Port 5050 / Vercel)
+                  │                  │
+                  │ Frontend UI      │
+                  │ API Routes       │
+                  │ GitHub Webhook   │
+                  └────────┬─────────┘
+                           │
+                           │ HTTP POST /api/github/pr-event (Server-to-Server)
+                           ▼
+                  ┌──────────────────┐
+                  │  FastAPI Service │ (Port 8000 / Render)
+                  │                  │
+                  │ Pydantic v2      │
+                  │ LLM Engine       │
+                  │ OpenRouter       │
+                  └──────────────────┘
 ```
 
-> [!NOTE]
-> The GitHub webhook receiving and signature verification infrastructure is fully implemented and verified locally. The public webhook tunnel (e.g. ngrok / smee) and GitHub App configuration will be linked in subsequent steps.
+- **Next.js (`http://localhost:5050`)**: Serves the developer UI and serverless Route Handlers (`/api/github/webhook`, `/api/ai-health`, `/api/ai/test`, `/api/ai/test-structured`).
+- **FastAPI AI Service (`http://localhost:8000`)**: Autonomous Python AI engine managing OpenRouter LLM interactions and Pydantic schema validation.
 
 ---
 
-## Services & Detailed Documentation
+## Services & Documentation
 
 | Directory | Service | Stack | Documentation |
 | :--- | :--- | :--- | :--- |
-| [`ai/`](file:///Users/arindas/Coding/Projects/PRism/ai) | **AI Service** | Python, FastAPI, Pydantic v2, OpenAI SDK | [AI Service README](file:///Users/arindas/Coding/Projects/PRism/ai/README.md) |
-| [`backend/`](file:///Users/arindas/Coding/Projects/PRism/backend) | **Backend Gateway** | Node.js, Express, Crypto HMAC, CORS | [Backend README](file:///Users/arindas/Coding/Projects/PRism/backend/README.md) |
-| [`frontend/`](file:///Users/arindas/Coding/Projects/PRism/frontend) | **Frontend UI** | React 19, Vite | [Frontend README](file:///Users/arindas/Coding/Projects/PRism/frontend/README.md) |
+| **`PRism/`** (Root) | **Next.js Web App & API** | Next.js 15 (App Router), React 19, TypeScript | *This document* |
+| [`ai/`](file:///Users/arindas/Coding/Projects/PRism/ai) | **AI Intelligence Engine** | Python 3.11+, FastAPI, Pydantic v2, OpenAI SDK | [AI Service README](file:///Users/arindas/Coding/Projects/PRism/ai/README.md) |
 
 ---
 
 ## Quickstart
 
-Start all three services concurrently with a single command:
+Start both services concurrently with a single command:
 
 ```bash
 ./dev.sh
-# or: npm run dev
+# or: npm run dev:all
 ```
 
-- **Frontend:** [http://localhost:5173](http://localhost:5173)
-- **Backend:** [http://localhost:8080](http://localhost:8080)
-- **AI Service:** [http://localhost:8000](http://localhost:8000)
+- **Next.js App (UI & API):** [http://localhost:5050](http://localhost:5050)
+- **FastAPI AI Service:** [http://localhost:8000](http://localhost:8000)
+
+### Running Services Individually
+
+```bash
+# Terminal 1: FastAPI AI Service
+npm run dev:ai
+
+# Terminal 2: Next.js App
+npm run dev
+```
 
 ### Testing Webhooks Locally
 

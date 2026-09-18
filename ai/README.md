@@ -1,6 +1,6 @@
 # PRism — AI Service (`ai/`)
 
-The **AI Service** is a Python service built with **FastAPI**, **Pydantic v2**, and the **OpenAI Python SDK**. It serves as the core intelligence engine for PRism, responsible for ingesting validated PR webhook events, communicating with LLM providers (via OpenRouter), formatting prompts, parsing code, and generating strictly validated, structured findings.
+The **AI Service** is a Python service built with **FastAPI**, **Pydantic v2**, and the **OpenAI Python SDK**. It serves as the core intelligence engine for PRism, responsible for ingesting validated PR webhook events forwarded from Next.js, communicating with LLM providers (via OpenRouter), formatting prompts, parsing code, and generating strictly validated, structured findings.
 
 ---
 
@@ -42,8 +42,7 @@ cp .env.example .env
 | `OPENROUTER_API_KEY` | *(Required)* | Your OpenRouter API key. |
 | `OPENROUTER_MODEL` | `openrouter/free` | Target model ID (e.g., `openai/gpt-4o`, `anthropic/claude-3.5-sonnet`). |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Base URL for the OpenAI-compatible API. |
-| `FRONTEND_URL` | `http://localhost:5173` | Allowed origin for frontend requests. |
-| `BACKEND_URL` | `http://localhost:8080` | Allowed origin for backend gateway requests. |
+| `NEXTJS_URL` | `http://localhost:5050` | Allowed origin for Next.js app requests. |
 | `ALLOWED_ORIGINS` | `""` | Optional comma-separated list to override allowed origins. |
 
 ---
@@ -63,7 +62,7 @@ cp .env.example .env
 - **`StructuredTestRequest`**: Payload for structured analysis tests (`code: str | None`).
 
 ### GitHub Event Models ([`app/models/github.py`](file:///Users/arindas/Coding/Projects/PRism/ai/app/models/github.py))
-- **`PREventPayload`**: Standardized PR webhook event payload forwarded from the Node backend:
+- **`PREventPayload`**: Standardized PR webhook event payload forwarded from the Next.js backend:
   - `deliveryId`: Unique delivery GUID string.
   - `event`: Event type (`"pull_request"`).
   - `action`: Action type (`"opened" | "synchronize" | "reopened"`).
@@ -81,7 +80,7 @@ Root health check endpoint.
 - **Response:** `{"message": "PRism AI service is running"}`
 
 ### 2. `POST /api/github/pr-event`
-Receives and validates normalized PR events forwarded from the Node.js backend gateway.
+Receives and validates normalized PR events forwarded from Next.js route handlers.
 - **Request Body:** `PREventPayload`
 - **Response:**
   ```json

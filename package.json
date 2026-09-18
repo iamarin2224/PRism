@@ -1,14 +1,27 @@
 {
   "name": "prism",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "PRism — Agentic Pull Request Review System",
   "scripts": {
-    "dev": "./dev.sh",
+    "dev": "next dev -p 5050",
+    "build": "next build",
+    "start": "next start -p 5050",
+    "lint": "next lint",
+    "dev:all": "./dev.sh",
     "dev:ai": "cd ai && ([ -f .venv/bin/uvicorn ] && .venv/bin/uvicorn app.main:app --port 8000 --reload || uvicorn app.main:app --port 8000 --reload)",
-    "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "npm --prefix frontend run dev",
-    "check": "curl -s http://localhost:8080/api/ai-health && echo ''",
-    "test:webhook": "npm --prefix backend run test:webhook"
+    "test:webhook": "node scripts/test-webhook.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "next": "^15.2.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.2"
   }
 }

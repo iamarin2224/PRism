@@ -17,17 +17,20 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "openrouter/free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
-    # CORS configuration with fallback defaults
-    FRONTEND_URL: str = "http://localhost:5173"
-    BACKEND_URL: str = "http://localhost:8080"
+    # CORS configuration with fallback defaults (Next.js runs on port 5050)
+    NEXTJS_URL: str = "http://localhost:5050"
+    FRONTEND_URL: str = "http://localhost:5050"
+    BACKEND_URL: str = "http://localhost:5050"
     ALLOWED_ORIGINS: str = ""
 
     @property
     def allowed_origins_list(self) -> List[str]:
-        """Return allowed CORS origins from ALLOWED_ORIGINS or fallback to FRONTEND_URL & BACKEND_URL."""
+        """Return allowed CORS origins from ALLOWED_ORIGINS or fallback to configured URLs."""
         if self.ALLOWED_ORIGINS.strip():
             return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
-        return [self.FRONTEND_URL.strip(), self.BACKEND_URL.strip()]
+        
+        origins = {self.NEXTJS_URL.strip(), self.FRONTEND_URL.strip(), self.BACKEND_URL.strip(), "http://localhost:5050"}
+        return list(origins)
 
 
 settings = Settings()

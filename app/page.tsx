@@ -1,107 +1,113 @@
-import { useState } from 'react'
-import './App.css'
+'use client';
 
-function App() {
-  const [prompt, setPrompt] = useState('Explain what SQL injection is and how to prevent it.')
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [activeTest, setActiveTest] = useState(null)
+import { useState } from 'react';
+import { Finding, FindingSeverity } from '@/lib/types';
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+interface TestResult {
+  message?: string;
+  response?: string;
+  findings?: Finding[];
+}
+
+export default function Home() {
+  const [prompt, setPrompt] = useState('Explain what SQL injection is and how to prevent it.');
+  const [result, setResult] = useState<TestResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTest, setActiveTest] = useState<'health' | 'text' | 'structured' | null>(null);
 
   const handleHealthCheck = async () => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setActiveTest('health')
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setActiveTest('health');
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ai-health`)
-      const data = await res.json()
+      const res = await fetch('/api/ai-health');
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || data.error || `Error status ${res.status}`)
+        throw new Error(data.details || data.error || `Error status ${res.status}`);
       }
-      setResult(data)
-    } catch (err) {
-      setError(err.message || 'Failed to connect to backend')
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to AI service');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleTestLLM = async () => {
     if (!prompt.trim()) {
-      setError('Please provide a prompt.')
-      return
+      setError('Please provide a prompt.');
+      return;
     }
 
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setActiveTest('text')
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setActiveTest('text');
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ai/test`, {
+      const res = await fetch('/api/ai/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
+      });
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || data.error || `Error status ${res.status}`)
+        throw new Error(data.details || data.error || `Error status ${res.status}`);
       }
-      setResult(data)
-    } catch (err) {
-      setError(err.message || 'Request failed')
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Request failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleTestStructured = async () => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setActiveTest('structured')
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setActiveTest('structured');
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/ai/test-structured`, {
+      const res = await fetch('/api/ai/test-structured', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
-      })
-      const data = await res.json()
+      });
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || data.error || `Error status ${res.status}`)
+        throw new Error(data.details || data.error || `Error status ${res.status}`);
       }
-      setResult(data)
-    } catch (err) {
-      setError(err.message || 'Request failed')
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Request failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = (severity?: FindingSeverity | string) => {
     switch (severity?.toLowerCase()) {
       case 'critical':
       case 'high':
-        return '#ef4444'
+        return '#ef4444';
       case 'medium':
-        return '#f59e0b'
+        return '#f59e0b';
       case 'low':
-        return '#10b981'
+        return '#10b981';
       default:
-        return '#6b7280'
+        return '#6b7280';
     }
-  }
+  };
 
   return (
-    <section id="center" style={{ padding: '40px 20px', maxWidth: '850px', margin: '0 auto' }}>
+    <section style={{ padding: '40px 20px', maxWidth: '850px', margin: '0 auto', width: '100%' }}>
       <h1>PRism</h1>
       <p style={{ margin: '0 auto 24px', opacity: 0.85 }}>
-        Agentic Pull Request Review System — Phase 1: LLM &amp; Structured Output Integration
+        Agentic Pull Request Review System — Next.js + FastAPI Integration
       </p>
 
       {/* Prompt input area */}
@@ -128,45 +134,50 @@ function App() {
             fontFamily: 'inherit',
             fontSize: '15px',
             resize: 'vertical',
-            boxSizing: 'border-box',
           }}
         />
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          marginBottom: '24px',
+        }}
+      >
         <button
           type="button"
-          className="counter"
+          className="counter-btn"
           onClick={handleTestLLM}
           disabled={loading}
-          style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
         >
           {loading && activeTest === 'text' ? 'Generating...' : 'Test LLM (Text)'}
         </button>
 
         <button
           type="button"
-          className="counter"
+          className="counter-btn"
           onClick={handleTestStructured}
           disabled={loading}
-          style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
         >
           {loading && activeTest === 'structured' ? 'Analyzing...' : 'Test Structured Output'}
         </button>
 
         <button
           type="button"
-          className="counter"
+          className="counter-btn"
           onClick={handleHealthCheck}
           disabled={loading}
-          style={{ cursor: loading ? 'not-allowed' : 'pointer', opacity: 0.8 }}
+          style={{ opacity: 0.8 }}
         >
           {loading && activeTest === 'health' ? 'Checking...' : 'Check Health'}
         </button>
       </div>
 
-      {/* Error state */}
+      {/* Error display */}
       {error && (
         <div
           style={{
@@ -178,7 +189,6 @@ function App() {
             border: '1px solid rgba(239, 68, 68, 0.4)',
             color: '#ef4444',
             marginBottom: '20px',
-            boxSizing: 'border-box',
           }}
         >
           <strong>Error:</strong> {error}
@@ -195,17 +205,24 @@ function App() {
             borderRadius: '8px',
             backgroundColor: 'var(--social-bg)',
             border: '1px solid var(--border)',
-            boxSizing: 'border-box',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '14px',
+            }}
+          >
             <h3 style={{ margin: 0, fontSize: '18px' }}>Output Result</h3>
             <span style={{ fontSize: '12px', opacity: 0.7 }}>Test: {activeTest}</span>
           </div>
 
-          {/* If simple message / LLM text response */}
+          {/* Simple message (e.g. health check) */}
           {result.message && <p style={{ margin: 0 }}>{result.message}</p>}
 
+          {/* LLM text response */}
           {result.response && (
             <div
               style={{
@@ -220,7 +237,7 @@ function App() {
             </div>
           )}
 
-          {/* If structured review findings */}
+          {/* Structured review findings */}
           {result.findings && (
             <div>
               <p style={{ marginBottom: '12px', fontSize: '14px', opacity: 0.8 }}>
@@ -237,7 +254,15 @@ function App() {
                       backgroundColor: 'var(--code-bg)',
                     }}
                   >
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        marginBottom: '6px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
                       <span
                         style={{
                           fontSize: '11px',
@@ -278,7 +303,5 @@ function App() {
         </div>
       )}
     </section>
-  )
+  );
 }
-
-export default App

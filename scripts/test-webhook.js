@@ -1,8 +1,8 @@
 /**
- * PRism — GitHub Webhook Local Test Runner
+ * PRism — GitHub Webhook Next.js Route Handler Test Suite
  *
  * Verifies HMAC-SHA256 signature verification, header parsing,
- * event filtering, and forwarding logic against a running backend.
+ * event filtering, and forwarding logic against Next.js (http://localhost:5050).
  */
 
 const crypto = require('crypto');
@@ -11,8 +11,8 @@ const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
-const SECRET = process.env.GITHUB_WEBHOOK_SECRET;
+const TARGET_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:5050';
+const SECRET = process.env.GITHUB_WEBHOOK_SECRET || 'development_webhook_secret';
 
 function computeSignature(payloadString, secret) {
   const hmac = crypto.createHmac('sha256', secret);
@@ -29,7 +29,7 @@ async function runTest(testName, { event, signature, body, expectedStatus, asser
   headers['X-GitHub-Delivery'] = crypto.randomUUID();
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/github/webhook`, {
+    const res = await fetch(`${TARGET_URL}/api/github/webhook`, {
       method: 'POST',
       headers,
       body: payloadStr,
@@ -56,8 +56,8 @@ async function runTest(testName, { event, signature, body, expectedStatus, asser
 
 async function main() {
   console.log('\n======================================================');
-  console.log(`  PRism GitHub Webhook Test Suite`);
-  console.log(`  Target: ${BACKEND_URL}/api/github/webhook`);
+  console.log(`  PRism GitHub Webhook Test Suite (Next.js)`);
+  console.log(`  Target: ${TARGET_URL}/api/github/webhook`);
   console.log('======================================================\n');
 
   let passed = 0;
