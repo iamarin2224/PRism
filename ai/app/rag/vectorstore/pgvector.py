@@ -192,6 +192,88 @@ class PgVectorStore:
             latency_ms=round(latency_ms, 2),
         )
 
+    async def exact_text_search(
+        self,
+        query: str,
+        repo_name: str,
+        limit: int = 20,
+        file_path_filter: Optional[str] = None,
+    ) -> List[dict]:
+        """
+        Executes a deterministic textual search (ILIKE) on indexed code chunks in PostgreSQL.
+        """
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            sql = """
+                SELECT id, repo_name, file_path, language, start_line, end_line, symbol, content
+                FROM code_chunks
+                WHERE repo_name = $1
+                  AND content ILIKE $2
+                  AND ($4::text IS NULL OR file_path = $4)
+                ORDER BY file_path ASC, start_line ASC
+                LIMIT $3;
+            """
+            rows = await conn.fetch(sql, repo_name, f"%{query}%", limit, file_path_filter)
+            return [
+                {
+                    "id": str(r["id"]),
+                    "repo_name": r["repo_name"],
+                    "file_path": r["file_path"],
+                    "language": r["language"],
+                    "start_line": r["start_line"],
+                    "end_line": r["end_line"],
+                    "symbol": r["symbol"],
+                    "content": r["content"],
+                }
+                for r in rows
+            ]
+
+    async def find_symbol_references(
+        self,
+        symbol: str,
+        repo_name: str,
+        limit: int = 30,
+    ) -> List[dict]:
+        """
+        Searches for definitions and references to a symbol within indexed code chunks.
+        """
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            # Matches exact symbol definition column OR symbol pattern in content
+            sql = """
+                SELECT id, repo_name, file_path, language, start_line, end_line, symbol, content,
+                       CASE 
+                           WHEN symbol = $1 THEN 'definition'
+                           WHEN content ILIKE ('%import%' || $1 || '%') OR content ILIKE ('%from%' || $1 || '%') THEN 'import'
+                           ELSE 'reference'
+                       END AS reference_type
+                FROM code_chunks
+                WHERE repo_name = $2
+                  AND (symbol = $1 OR content ~ ('\\m' || $3 || '\\M'))
+                ORDER BY 
+                    CASE WHEN symbol = $1 THEN 0 ELSE 1 END,
+                    file_path ASC, start_line ASC
+                LIMIT $4;
+            """
+            # Escape regex special characters in symbol
+            import re
+            escaped_symbol = re.escape(symbol)
+            rows = await conn.fetch(sql, symbol, repo_name, escaped_symbol, limit)
+            return [
+                {
+                    "id": str(r["id"]),
+                    "repo_name": r["repo_name"],
+                    "file_path": r["file_path"],
+                    "language": r["language"],
+                    "start_line": r["start_line"],
+                    "end_line": r["end_line"],
+                    "symbol": r["symbol"],
+                    "content": r["content"],
+                    "reference_type": r["reference_type"],
+                }
+                for r in rows
+            ]
+
     async def get_chunk_count(self, repo_name: str) -> int:
         """Returns the total number of indexed chunks for a repository."""
         pool = await get_db_pool()
