@@ -20,6 +20,15 @@ async def get_db_pool() -> asyncpg.Pool:
         
         async def init_conn(conn):
             await register_vector(conn)
+            # Tune HNSW vector search recall on filtered/multi-tenant queries
+            try:
+                await conn.execute("SET hnsw.ef_search = 60;")
+            except Exception:
+                pass
+            try:
+                await conn.execute("SET hnsw.iterative_scan = 'relaxed_order';")
+            except Exception:
+                pass
 
         # Create connection pool
         _pool = await asyncpg.create_pool(
@@ -29,7 +38,7 @@ async def get_db_pool() -> asyncpg.Pool:
             init=init_conn,
             command_timeout=60,
         )
-        logger.info("Initialized asyncpg database connection pool.")
+        logger.info("Initialized asyncpg database connection pool with tuned HNSW parameters.")
     return _pool
 
 

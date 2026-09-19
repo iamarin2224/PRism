@@ -273,32 +273,41 @@ class IndexingPipeline:
             await vector_store.delete_all_repo_chunks(repo_name)
             return
 
-        # 2. Language-aware code splitting
-        all_chunks: List[CodeChunk] = []
-        for f in files:
-            chunks = code_splitter.split_file(
-                file_path=f.path,
-                content=f.content,
-                repo_name=repo_name,
-                commit_sha=commit_sha,
-            )
-            all_chunks.extend(chunks)
+        # 2. Language-aware code splitting offloaded to worker thread
+        all_chunks = await asyncio.to_thread(
+            self._chunk_files,
+            files=files,
+            repo_name=repo_name,
+            commit_sha=commit_sha,
+        )
 
         if not all_chunks:
             logger.warning(f"No chunks produced for {repo_name}")
             await vector_store.delete_all_repo_chunks(repo_name)
             return
 
-        # 3. Generate embeddings via AICredits in batches
+        # 3. Generate embeddings via AICredits in worker thread (non-blocking)
         texts_to_embed = [c.content for c in all_chunks]
-        embeddings = embedding_service.embed_texts(texts_to_embed)
+        embeddings = await asyncio.to_thread(embedding_service.embed_texts, texts_to_embed)
 
         for chunk, emb in zip(all_chunks, embeddings):
             chunk.embedding = emb
 
-        # 4. Atomically delete old repo chunks and insert new chunks into pgvector
-        await vector_store.delete_all_repo_chunks(repo_name)
-        await vector_store.insert_chunks(all_chunks)
+        # 4. Atomically replace old repo chunks with new chunks in a single transaction
+        await vector_store.replace_all_chunks(repo_name, all_chunks)
+
+    def _chunk_files(self, files: List[IngestedFile], repo_name: str, commit_sha: str) -> List[CodeChunk]:
+        """Synchronous CPU worker for parsing ASTs and chunking code files."""
+        chunks: List[CodeChunk] = []
+        for f in files:
+            file_chunks = code_splitter.split_file(
+                file_path=f.path,
+                content=f.content,
+                repo_name=repo_name,
+                commit_sha=commit_sha,
+            )
+            chunks.extend(file_chunks)
+        return chunks
 
     async def _run_incremental_indexing(
         self,
@@ -328,20 +337,17 @@ class IndexingPipeline:
         if not files:
             return
 
-        # 3. Chunk and embed changed files
-        new_chunks: List[CodeChunk] = []
-        for f in files:
-            chunks = code_splitter.split_file(
-                file_path=f.path,
-                content=f.content,
-                repo_name=repo_name,
-                commit_sha=commit_sha,
-            )
-            new_chunks.extend(chunks)
+        # 3. Chunk and embed changed files offloaded to worker thread
+        new_chunks = await asyncio.to_thread(
+            self._chunk_files,
+            files=files,
+            repo_name=repo_name,
+            commit_sha=commit_sha,
+        )
 
         if new_chunks:
             texts_to_embed = [c.content for c in new_chunks]
-            embeddings = embedding_service.embed_texts(texts_to_embed)
+            embeddings = await asyncio.to_thread(embedding_service.embed_texts, texts_to_embed)
 
             for chunk, emb in zip(new_chunks, embeddings):
                 chunk.embedding = emb

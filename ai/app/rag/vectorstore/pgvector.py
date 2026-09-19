@@ -15,47 +15,50 @@ class PgVectorStore:
     Enforces strict repository scoping (WHERE repo_name = :repo_name) on all queries.
     """
 
-    async def insert_chunks(self, chunks: List[CodeChunk]) -> int:
-        """Batch inserts code chunks and their embeddings into the code_chunks table."""
+    async def insert_chunks(self, chunks: List[CodeChunk], batch_size: int = 250) -> int:
+        """Batch inserts code chunks and their embeddings into the code_chunks table in chunks of batch_size."""
         if not chunks:
             return 0
 
         pool = await get_db_pool()
-        async with pool.acquire() as conn:
-            records = []
-            for c in chunks:
-                if c.embedding is None:
-                    continue
-                # Convert list of floats to numpy array for pgvector
-                vec = np.array(c.embedding, dtype=np.float32)
-                records.append(
-                    (
-                        c.repo_name,
-                        c.commit_sha,
-                        c.file_path,
-                        c.language,
-                        c.start_line,
-                        c.end_line,
-                        c.symbol,
-                        c.content,
-                        c.token_count,
-                        vec,
-                    )
+        records = []
+        for c in chunks:
+            if c.embedding is None:
+                continue
+            vec = np.array(c.embedding, dtype=np.float32)
+            records.append(
+                (
+                    c.repo_name,
+                    c.commit_sha,
+                    c.file_path,
+                    c.language,
+                    c.start_line,
+                    c.end_line,
+                    c.symbol,
+                    c.content,
+                    c.token_count,
+                    vec,
                 )
+            )
 
-            if not records:
-                return 0
+        if not records:
+            return 0
 
-            # Batch insert using asyncpg executemany with generated UUIDs and timestamps
-            query = """
-                INSERT INTO code_chunks (
-                    id, repo_name, commit_sha, file_path, language,
-                    start_line, end_line, symbol, content, token_count, embedding, created_at
-                ) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW());
-            """
-            await conn.executemany(query, records)
-            logger.info(f"Inserted {len(records)} code chunks into pgvector store.")
-            return len(records)
+        query = """
+            INSERT INTO code_chunks (
+                id, repo_name, commit_sha, file_path, language,
+                start_line, end_line, symbol, content, token_count, embedding, created_at
+            ) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW());
+        """
+
+        async with pool.acquire() as conn:
+            # Batch executemany in fixed chunks to prevent memory/buffer exhaustion
+            for i in range(0, len(records), batch_size):
+                batch = records[i : i + batch_size]
+                await conn.executemany(query, batch)
+
+        logger.info(f"Inserted {len(records)} code chunks into pgvector store in batches of {batch_size}.")
+        return len(records)
 
 
     async def delete_chunks_by_files(self, repo_name: str, file_paths: List[str]) -> int:
@@ -77,8 +80,54 @@ class PgVectorStore:
             logger.info(f"Deleted {count} stale chunks for {len(file_paths)} files in {repo_name}.")
             return count
 
+    async def replace_all_chunks(self, repo_name: str, chunks: List[CodeChunk], batch_size: int = 250) -> int:
+        """
+        Atomically replaces all code chunks for a repository within a single database transaction,
+        inserting in batches of batch_size. If chunk insertion fails, old chunks are NOT lost.
+        """
+        records = []
+        for c in chunks:
+            if c.embedding is None:
+                continue
+            vec = np.array(c.embedding, dtype=np.float32)
+            records.append(
+                (
+                    c.repo_name,
+                    c.commit_sha,
+                    c.file_path,
+                    c.language,
+                    c.start_line,
+                    c.end_line,
+                    c.symbol,
+                    c.content,
+                    c.token_count,
+                    vec,
+                )
+            )
+
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. Delete old chunks inside transaction
+                await conn.execute("DELETE FROM code_chunks WHERE repo_name = $1;", repo_name)
+
+                # 2. Insert new chunks inside same transaction in batches
+                if records:
+                    query = """
+                        INSERT INTO code_chunks (
+                            id, repo_name, commit_sha, file_path, language,
+                            start_line, end_line, symbol, content, token_count, embedding, created_at
+                        ) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW());
+                    """
+                    for i in range(0, len(records), batch_size):
+                        batch = records[i : i + batch_size]
+                        await conn.executemany(query, batch)
+
+            logger.info(f"Atomically replaced chunks for {repo_name}: {len(records)} new chunks inserted in batches of {batch_size}.")
+            return len(records)
+
     async def delete_all_repo_chunks(self, repo_name: str) -> int:
-        """Deletes all chunks for a repository (for full re-indexing)."""
+        """Deletes all chunks for a repository (for full re-indexing or repo removal)."""
         pool = await get_db_pool()
         async with pool.acquire() as conn:
             result = await conn.execute(

@@ -23,7 +23,7 @@ class EmbeddingService:
             )
         return self._client
 
-    def embed_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_texts(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """
         Generates vector embeddings for a list of texts using AICredits
         and the configured embedding model (e.g. openai/text-embedding-3-small).
