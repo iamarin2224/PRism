@@ -128,7 +128,6 @@ dmypy.json
 # Local vector databases / indexes
 .chroma/
 chroma_db/
-vectorstore/
 vector_store/
 
 # Local embeddings / model caches

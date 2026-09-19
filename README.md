@@ -1,46 +1,57 @@
 # PRism — Agentic Pull Request Review System
 
-PRism is an intelligent, multi-stage agentic code review system designed to analyze pull requests, detect bugs, security vulnerabilities, and code quality regressions, and produce structured, actionable developer feedback.
+PRism is an intelligent, multi-stage agentic code review platform designed to analyze pull requests, detect bugs, security vulnerabilities, and code quality regressions, and produce structured, actionable developer feedback grounded in full repository context.
 
 ---
 
 ## Architecture Overview
 
 ```text
-                         GitHub
-                           │
-                           │ Webhook POST /api/github/webhook (HMAC-SHA256 Signed)
-                           ▼
-                  ┌──────────────────┐
-                  │     Next.js      │ (Port 5050 / Vercel)
-                  │                  │
-                  │ Frontend UI      │
-                  │ API Routes       │
-                  │ GitHub Webhook   │
-                  └────────┬─────────┘
-                           │
-                           │ HTTP POST /api/github/pr-event (Server-to-Server)
-                           ▼
-                  ┌──────────────────┐
-                  │  FastAPI Service │ (Port 8000 / Render)
-                  │                  │
-                  │ Pydantic v2      │
-                  │ LLM Engine       │
-                  │ OpenRouter       │
-                  └──────────────────┘
+                               GitHub
+                                 │
+                                 │ Webhooks (HMAC-SHA256 Signed)
+                                 ▼
+                     ┌───────────────────────┐
+                     │   Next.js Platform    │ (Port 5050)
+                     │                       │
+                     │  • Web Dashboard (UI) │
+                     │  • GitHub Webhook Hub │
+                     │  • API Gateway        │
+                     │  • Prisma DB Client   │
+                     └───────────┬───────────┘
+                                 │
+                                 │ Async HTTP Proxy / Event Dispatch
+                                 ▼
+                     ┌───────────────────────┐
+                     │   FastAPI AI Engine   │ (Port 8000)
+                     │                       │
+                     │  • Code-Aware RAG     │
+                     │  • AST-Based Splitting│
+                     │  • Vector Store (pgv) │
+                     │  • LLM Structured Out │
+                     └───────────┬───────────┘
+                                 │
+                   ┌─────────────┴─────────────┐
+                   ▼                           ▼
+        ┌─────────────────────┐     ┌─────────────────────┐
+        │  OpenRouter / LLMs  │     │ Neon PostgreSQL DB  │
+        │  (Reasoning Engine) │     │ (pgvector + HNSW)   │
+        └─────────────────────┘     └─────────────────────┘
 ```
 
-- **Next.js (`http://localhost:5050`)**: Serves the developer UI and serverless Route Handlers (`/api/github/webhook`, `/api/ai-health`, `/api/ai/test`, `/api/ai/test-structured`).
-- **FastAPI AI Service (`http://localhost:8000`)**: Autonomous Python AI engine managing OpenRouter LLM interactions and Pydantic schema validation.
+- **Next.js (`http://localhost:5050`)**: Web dashboard and webhook dispatcher. Handles HMAC-SHA256 signature verification, GitHub App event parsing (`pull_request`, `push`), and local test benches.
+- **FastAPI AI Engine (`http://localhost:8000`)**: Python engine handling prompt synthesis, language-aware AST code chunking, AICredits vector embeddings, pgvector retrieval, and LLM code review structured outputs.
+- **Neon PostgreSQL**: Serverless database storing repository indexing states and 1536-dimensional code vector embeddings with HNSW cosine indexes.
 
 ---
 
-## Services & Documentation
+## Repository Structure
 
-| Directory | Service | Stack | Documentation |
+| Directory | Service / Purpose | Stack | Documentation |
 | :--- | :--- | :--- | :--- |
-| **`PRism/`** (Root) | **Next.js Web App & API** | Next.js 15 (App Router), React 19, TypeScript | *This document* |
-| [`ai/`](file:///Users/arindas/Coding/Projects/PRism/ai) | **AI Intelligence Engine** | Python 3.11+, FastAPI, Pydantic v2, OpenAI SDK | [AI Service README](file:///Users/arindas/Coding/Projects/PRism/ai/README.md) |
+| **`PRism/`** (Root) | **Next.js Web Application & Webhook Gateway** | Next.js 15, React 19, TypeScript, Prisma v6 | *This document* |
+| [`ai/`](file:///Users/arindas/Coding/Projects/PRism/ai) | **FastAPI AI Engine & Code-Aware RAG** | Python 3.11+, FastAPI, Pydantic v2, pgvector, LangChain | [AI Service README](file:///Users/arindas/Coding/Projects/PRism/ai/README.md) |
+| [`prisma/`](file:///Users/arindas/Coding/Projects/PRism/prisma) | **Database Schemas & Migrations** | Prisma Schema, PostgreSQL with `vector` extension | [`schema.prisma`](file:///Users/arindas/Coding/Projects/PRism/prisma/schema.prisma) |
 
 ---
 
@@ -53,23 +64,27 @@ Start both services concurrently with a single command:
 # or: npm run dev:all
 ```
 
-- **Next.js App (UI & API):** [http://localhost:5050](http://localhost:5050)
-- **FastAPI AI Service:** [http://localhost:8000](http://localhost:8000)
+- **Next.js Dashboard:** [http://localhost:5050](http://localhost:5050)
+- **FastAPI AI Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Running Services Individually
 
 ```bash
-# Terminal 1: FastAPI AI Service
+# Terminal 1: FastAPI AI Engine
 npm run dev:ai
 
-# Terminal 2: Next.js App
+# Terminal 2: Next.js Frontend & API
 npm run dev
 ```
 
-### Testing Webhooks Locally
+---
 
-With the services running, execute the webhook test suite:
+## Testing & Verification
 
 ```bash
+# 1. Test GitHub Webhook HMAC Verification & Event Forwarding
 npm run test:webhook
+
+# 2. Test RAG Ingestion, Language Chunking & Token Filtering (inside ai/)
+cd ai && ./.venv/bin/python scripts/test_rag.py
 ```

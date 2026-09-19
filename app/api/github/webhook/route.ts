@@ -109,10 +109,43 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 6. Handle all other unhandled events safely
+  // 6. Handle "push" events (lightweight mark STALE for RAG indexing)
+  if (event === 'push') {
+    const repoFullName = payload.repository?.full_name;
+    const afterCommit = payload.after;
+    const ref = payload.ref;
+
+    if (!repoFullName) {
+      return NextResponse.json({ error: 'Missing repository in push payload' }, { status: 400 });
+    }
+
+    console.log(
+      `[GitHub Webhook] Received push event for ${repoFullName} (ref: ${ref || 'unknown'}, after: ${afterCommit || 'unknown'})`
+    );
+
+    try {
+      const { forwardPushEvent } = await import('@/lib/ai/client');
+      await forwardPushEvent(repoFullName, afterCommit, ref);
+      console.log(`[GitHub Webhook] Successfully notified AI service of push for ${repoFullName}`);
+    } catch (pushErr: any) {
+      console.error(`[GitHub Webhook] Failed to forward push event to AI service: ${pushErr.message}`);
+      // Acknowledge webhook receipt to prevent GitHub retry flood
+    }
+
+    return NextResponse.json({
+      status: 'success',
+      message: `Push event received and forwarded for repository ${repoFullName}`,
+      repo: repoFullName,
+      ref,
+      headCommit: afterCommit,
+    });
+  }
+
+  // 7. Handle all other unhandled events safely
   console.log(`[GitHub Webhook] Ignored unhandled event type: '${event}'`);
   return NextResponse.json({
     status: 'ignored',
     reason: `GitHub event '${event}' is not handled`,
   });
 }
+

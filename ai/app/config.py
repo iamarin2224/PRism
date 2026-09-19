@@ -13,9 +13,24 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # OpenRouter Text Generation Settings
     OPENROUTER_API_KEY: str = ""
-    OPENROUTER_MODEL: str = "openrouter/free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "openrouter/free"
+
+    # AICredits Embedding Settings
+    AICREDITS_API_KEY: str = ""
+    AICREDITS_BASE_URL: str = "https://api.aicredits.in/v1"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSION: int = 1536
+
+
+    # GitHub API Token (optional fallback for rate limits)
+    GITHUB_TOKEN: str = ""
+
+    # Neon PostgreSQL Database Settings
+
+    DATABASE_URL: str = ""
 
     # CORS configuration with fallback defaults (Next.js runs on port 5050)
     NEXTJS_URL: str = "http://localhost:5050"

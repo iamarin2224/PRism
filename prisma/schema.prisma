@@ -1,0 +1,58 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+enum IndexStatus {
+  NOT_INDEXED
+  INDEXING
+  INDEXED
+  STALE
+  FAILED
+}
+
+model Repository {
+  id             String      @id @default(uuid())
+  fullName       String      @unique @map("full_name")
+  owner          String
+  name           String
+  defaultBranch  String      @default("main") @map("default_branch")
+  installationId BigInt?     @map("installation_id")
+  indexedCommit  String?     @map("indexed_commit")
+  currentCommit  String?     @map("current_commit")
+  indexStatus    IndexStatus @default(NOT_INDEXED) @map("index_status")
+  errorMessage   String?     @map("error_message")
+  lastIndexedAt  DateTime?   @map("last_indexed_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@map("repositories")
+}
+
+model CodeChunk {
+  id         String   @id @default(uuid())
+  repoName   String   @map("repo_name")
+  commitSha  String   @map("commit_sha")
+  filePath   String   @map("file_path")
+  language   String
+  startLine  Int      @map("start_line")
+  endLine    Int      @map("end_line")
+  symbol     String?
+  content    String
+  tokenCount Int      @map("token_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Vector embedding column mapped via Unsupported("vector(1536)") for pgvector
+  embedding  Unsupported("vector(1536)")?
+
+  @@index([repoName, filePath], name: "code_chunks_repo_file_idx")
+  @@index([repoName, commitSha], name: "code_chunks_repo_commit_idx")
+  @@map("code_chunks")
+}
