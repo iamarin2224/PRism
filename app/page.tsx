@@ -98,7 +98,7 @@ export default function Home() {
     fetchRepositories();
   }, [fetchRepositories]);
 
-  // Auto-polling when indexing is active
+  // Auto-polling when indexing is active (waits 30s initially, then polls every 5s)
   useEffect(() => {
     const isAnyIndexing =
       selectedRepoState?.status === 'INDEXING' ||
@@ -106,14 +106,27 @@ export default function Home() {
 
     if (!isAnyIndexing) return;
 
-    const interval = setInterval(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    // Delay initial check by 30s, then start interval every 5s
+    const initialDelay = setTimeout(() => {
       fetchRepositories();
       if (targetRepo) {
         fetchCurrentRepoStatus(targetRepo);
       }
-    }, 4000);
 
-    return () => clearInterval(interval);
+      interval = setInterval(() => {
+        fetchRepositories();
+        if (targetRepo) {
+          fetchCurrentRepoStatus(targetRepo);
+        }
+      }, 5000);
+    }, 30000);
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (interval) clearInterval(interval);
+    };
   }, [selectedRepoState?.status, repoList, targetRepo, fetchRepositories, fetchCurrentRepoStatus]);
 
   // =========================================================================
