@@ -28,18 +28,28 @@ def test_model_router_tier_resolution():
     assert model_router.get_tier_for_role("tests") == "mid"
     assert model_router.get_tier_for_role("docs") == "free"
 
-    # Model and endpoints
-    high_model, high_url, _ = model_router.get_model_and_endpoint("high")
-    assert high_model == settings.HIGH_MODEL
-    assert high_url == settings.AICREDITS_BASE_URL
+    # When AICREDITS_API_KEY is present
+    with patch.object(settings, "AICREDITS_API_KEY", "aicredits_key_test"):
+        high_model, high_url, high_key = model_router.get_model_and_endpoint("high")
+        assert high_model == settings.HIGH_MODEL
+        assert high_url == settings.AICREDITS_BASE_URL
+        assert high_key == "aicredits_key_test"
 
-    mid_model, mid_url, _ = model_router.get_model_and_endpoint("mid")
-    assert mid_model == settings.MID_MODEL
-    assert mid_url == settings.AICREDITS_BASE_URL
+        mid_model, mid_url, mid_key = model_router.get_model_and_endpoint("mid")
+        assert mid_model == settings.MID_MODEL
+        assert mid_url == settings.AICREDITS_BASE_URL
+        assert mid_key == "aicredits_key_test"
 
-    free_model, free_url, _ = model_router.get_model_and_endpoint("free")
-    assert free_model == settings.OPENROUTER_MODEL
-    assert free_url == settings.OPENROUTER_BASE_URL
+        free_model, free_url, free_key = model_router.get_model_and_endpoint("free")
+        assert free_model == settings.OPENROUTER_MODEL
+        assert free_url == settings.OPENROUTER_BASE_URL
+
+    # When AICREDITS_API_KEY is missing, full fallback to OpenRouter
+    with patch.object(settings, "AICREDITS_API_KEY", ""), patch.object(settings, "OPENROUTER_API_KEY", "openrouter_key_test"):
+        high_model, high_url, high_key = model_router.get_model_and_endpoint("high")
+        assert high_model == settings.OPENROUTER_MODEL
+        assert high_url == settings.OPENROUTER_BASE_URL
+        assert high_key == "openrouter_key_test"
 
 
 def test_specialist_output_parsing():

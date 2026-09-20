@@ -36,27 +36,21 @@ class ModelRouter:
     def get_model_and_endpoint(tier: ModelTier) -> Tuple[str, str, str]:
         """
         Returns (model_id, base_url, api_key) for the given tier.
+        If AICREDITS_API_KEY is not provided, high and mid tiers cleanly fallback
+        to OPENROUTER_BASE_URL, OPENROUTER_API_KEY, and OPENROUTER_MODEL.
         """
+        # If AICredits credentials are missing, route entire stack to OpenRouter
+        if not settings.AICREDITS_API_KEY.strip():
+            return settings.OPENROUTER_MODEL, settings.OPENROUTER_BASE_URL, settings.OPENROUTER_API_KEY
+
         if tier == "high":
-            api_key = settings.AICREDITS_API_KEY
-            base_url = settings.AICREDITS_BASE_URL
-            model = settings.HIGH_MODEL
-            return model, base_url, api_key
+            return settings.HIGH_MODEL, settings.AICREDITS_BASE_URL, settings.AICREDITS_API_KEY
         elif tier == "mid":
-            api_key = settings.AICREDITS_API_KEY
-            base_url = settings.AICREDITS_BASE_URL
-            model = settings.MID_MODEL
-            return model, base_url, api_key
+            return settings.MID_MODEL, settings.AICREDITS_BASE_URL, settings.AICREDITS_API_KEY
         elif tier == "free":
-            api_key = settings.OPENROUTER_API_KEY
-            base_url = settings.OPENROUTER_BASE_URL
-            model = settings.OPENROUTER_MODEL
-            return model, base_url, api_key
+            return settings.OPENROUTER_MODEL, settings.OPENROUTER_BASE_URL, settings.OPENROUTER_API_KEY
         else:
-            api_key = settings.OPENROUTER_API_KEY
-            base_url = settings.OPENROUTER_BASE_URL
-            model = settings.OPENROUTER_MODEL
-            return model, base_url, api_key
+            return settings.MID_MODEL, settings.AICREDITS_BASE_URL, settings.AICREDITS_API_KEY
 
     def get_chat_model(
         self,
