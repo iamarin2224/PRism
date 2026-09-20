@@ -16,6 +16,10 @@ from app.tools.history.git_history import (
 from app.tools.history.blame import get_blame_tool
 from app.tools.web.search import web_search_tool
 from app.tools.web.fetch import fetch_webpage_tool
+from app.tools.tests import (
+    run_tests_tool,
+    run_linter_tool,
+)
 
 
 ALL_TOOLS: List[BaseTool] = [
@@ -35,6 +39,9 @@ ALL_TOOLS: List[BaseTool] = [
     # External Knowledge / Web Tools
     web_search_tool,
     fetch_webpage_tool,
+    # Dynamic Sandbox Execution Tools
+    run_tests_tool,
+    run_linter_tool,
 ]
 
 _TOOL_MAP: Dict[str, BaseTool] = {tool.name: tool for tool in ALL_TOOLS}

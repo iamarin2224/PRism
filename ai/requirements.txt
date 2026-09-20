@@ -25,3 +25,6 @@ typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.53.0
 numpy>=2.0.0
+e2b>=1.0.0
+e2b-code-interpreter>=1.0.0
+pytest==8.3.5

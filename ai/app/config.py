@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # GitHub API Token (optional fallback for rate limits)
     GITHUB_TOKEN: str = ""
 
+    # E2B Sandbox Settings
+    E2B_API_KEY: str = ""
+    E2B_TEMPLATE: str = "prism-polyglot-reviewer"
+
     # Neon PostgreSQL Database Settings
 
     DATABASE_URL: str = ""

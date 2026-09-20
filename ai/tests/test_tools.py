@@ -52,10 +52,10 @@ from app.tools.web.search import WebSearchResultItem
 
 def test_tool_registry_and_openai_schemas():
     print("\n--- 1. Testing Tool Registry & OpenAI Function Schemas ---")
-    assert len(ALL_TOOLS) == 12, f"Expected 12 registered tools, got {len(ALL_TOOLS)}"
+    assert len(ALL_TOOLS) == 14, f"Expected 14 registered tools, got {len(ALL_TOOLS)}"
     
     openai_tools = tool_registry.get_all_openai_tools()
-    assert len(openai_tools) == 12, f"Expected 12 OpenAI tool schemas, got {len(openai_tools)}"
+    assert len(openai_tools) == 14, f"Expected 14 OpenAI tool schemas, got {len(openai_tools)}"
     
     for tool_def in openai_tools:
         assert tool_def["type"] == "function"
@@ -94,7 +94,7 @@ def test_ssrf_protection():
     print("  ✓ Allowed valid public URL: https://docs.github.com/en/rest")
 
 
-async def test_tool_execution_unit():
+def test_tool_execution_unit():
     print("\n--- 3. Testing Tool Execution & Failure Contracts ---")
     
     ctx = ToolContext(
@@ -106,31 +106,31 @@ async def test_tool_execution_unit():
     assert ctx.repo_name == "PRism"
 
     # 3.1 Missing context error contract
-    res_no_ctx = await read_file_tool.execute(ReadFileInput(path="src/index.ts"), context=None)
+    res_no_ctx = asyncio.run(read_file_tool.execute(ReadFileInput(path="src/index.ts"), context=None))
     assert not res_no_ctx.success
     assert "ToolContext" in (res_no_ctx.error or "")
     print("  ✓ read_file cleanly fails without ToolContext")
 
     # 3.2 Path traversal attack blocked
-    res_traversal = await read_file_tool.execute(ReadFileInput(path="../../etc/passwd"), context=ctx)
+    res_traversal = asyncio.run(read_file_tool.execute(ReadFileInput(path="../../etc/passwd"), context=ctx))
     assert not res_traversal.success
     assert "traversal" in (res_traversal.error or "").lower()
     print("  ✓ read_file blocks path traversal attempt")
 
     # 3.3 Line range validation
-    res_bad_lines = await read_file_tool.execute(
+    res_bad_lines = asyncio.run(read_file_tool.execute(
         ReadFileInput(path="package.json", start_line=50, end_line=10),
         context=ctx,
-    )
+    ))
     # Even if file doesn't exist remotely or start > end, it returns a structured failure
     assert not res_bad_lines.success
     print("  ✓ read_file validates start_line <= end_line")
 
     # 3.4 Search Codebase mode routing
-    res_empty_search = await search_codebase_tool.execute(
+    res_empty_search = asyncio.run(search_codebase_tool.execute(
         SearchCodebaseInput(query="   "),
         context=ctx,
-    )
+    ))
     assert not res_empty_search.success
     print("  ✓ search_codebase rejects empty query")
 
@@ -148,27 +148,27 @@ async def test_tool_execution_unit():
 
     mock_search_tool = web_search_tool
     mock_search_tool.provider = MockSearchProvider()
-    search_res = await mock_search_tool.execute(WebSearchInput(query="Next.js App Router"))
+    search_res = asyncio.run(mock_search_tool.execute(WebSearchInput(query="Next.js App Router")))
     assert search_res.success
     assert len(search_res.data) == 1
     assert search_res.data[0]["domain"] == "nextjs.org"
     print("  ✓ web_search returns structured results via provider abstraction")
 
     # 3.6 Fetch webpage SSRF blocked execution
-    fetch_blocked = await fetch_webpage_tool.execute(FetchWebpageInput(url="http://127.0.0.1:8000/docs"))
+    fetch_blocked = asyncio.run(fetch_webpage_tool.execute(FetchWebpageInput(url="http://127.0.0.1:8000/docs")))
     assert not fetch_blocked.success
     assert "SSRF Protection" in (fetch_blocked.error or "")
     print("  ✓ fetch_webpage blocks internal IP requests at tool execution level")
 
 
-async def main():
+def main():
     test_tool_registry_and_openai_schemas()
     test_ssrf_protection()
-    await test_tool_execution_unit()
+    test_tool_execution_unit()
     print("\n========================================================")
     print("🎉 ALL PHASE 4 TOOL LAYER TESTS PASSED SUCCESSFULLY!")
     print("========================================================")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
