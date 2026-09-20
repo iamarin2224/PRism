@@ -56,3 +56,141 @@ model CodeChunk {
   @@index([repoName, commitSha], name: "code_chunks_repo_commit_idx")
   @@map("code_chunks")
 }
+
+enum ReviewStatus {
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  AWAITING_HUMAN_APPROVAL
+  CANCELLED
+}
+
+enum RoutingDecision {
+  POST_GITHUB
+  REQUIRE_HUMAN_APPROVAL
+  DISMISSED
+}
+
+enum SpecialistType {
+  SECURITY
+  QUALITY
+  TESTS
+  DOCS
+  CRITIC
+  SYNTHESIS
+}
+
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum FindingCategory {
+  SECURITY
+  BUG
+  PERFORMANCE
+  DESIGN
+  TEST_COVERAGE
+  DOCUMENTATION
+  COMPLIANCE
+}
+
+enum FeedbackType {
+  ACCEPTED
+  DISMISSED
+  EDITED
+}
+
+model ReviewRun {
+  id              String           @id @default(uuid())
+  repoName        String           @map("repo_name")
+  prNumber        Int              @map("pr_number")
+  commitSha       String           @map("commit_sha")
+  baseSha         String           @map("base_sha")
+  status          ReviewStatus     @default(QUEUED)
+  routingDecision RoutingDecision? @map("routing_decision")
+  totalTokensIn   Int              @default(0) @map("total_tokens_in")
+  totalTokensOut  Int              @default(0) @map("total_tokens_out")
+  totalCostUsd    Float            @default(0.0) @map("total_cost_usd")
+  durationMs      Float?           @map("duration_ms")
+  errorMessage    String?          @map("error_message")
+  checkpointKey   String?          @map("checkpoint_key")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  findings        ReviewFinding[]
+  auditEvents     AuditEvent[]
+
+  @@index([repoName, prNumber], name: "review_runs_repo_pr_idx")
+  @@index([status], name: "review_runs_status_idx")
+  @@map("review_runs")
+}
+
+model ReviewFinding {
+  id            String          @id @default(uuid())
+  reviewRunId   String          @map("review_run_id")
+  specialist    SpecialistType
+  category      FindingCategory
+  severity      FindingSeverity
+  filePath      String          @map("file_path")
+  startLine     Int             @map("start_line")
+  endLine       Int             @map("end_line")
+  title         String
+  description   String
+  suggestion    String?
+  confidence    Float           @default(1.0)
+  agreementCount Int            @default(1) @map("agreement_count")
+  isVerified    Boolean         @default(false) @map("is_verified")
+  humanFeedback FeedbackType?   @map("human_feedback")
+  feedbackNotes String?         @map("feedback_notes")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  reviewRun     ReviewRun       @relation(fields: [reviewRunId], references: [id], onDelete: Cascade)
+
+  @@index([reviewRunId], name: "review_findings_run_idx")
+  @@index([filePath], name: "review_findings_file_idx")
+  @@map("review_findings")
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  reviewRunId String   @map("review_run_id")
+  spanId      String   @map("span_id")
+  nodeName    String   @map("node_name")
+  eventType   String   @map("event_type")
+  payload     Json     @default("{}")
+  tokensIn    Int      @default(0) @map("tokens_in")
+  tokensOut   Int      @default(0) @map("tokens_out")
+  costUsd     Float    @default(0.0) @map("cost_usd")
+  durationMs  Float?   @map("duration_ms")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  reviewRun   ReviewRun @relation(fields: [reviewRunId], references: [id], onDelete: Cascade)
+
+  @@index([reviewRunId], name: "audit_events_run_idx")
+  @@index([nodeName], name: "audit_events_node_idx")
+  @@map("audit_events")
+}
+
+model EpisodicMemory {
+  id           String       @id @default(uuid())
+  repoName     String       @map("repo_name")
+  prNumber     Int          @map("pr_number")
+  findingHash  String       @map("finding_hash")
+  feedbackType FeedbackType @map("feedback_type")
+  filePath     String       @map("file_path")
+  title        String
+  comment      String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  // Embedding column for semantic retrieval of past human feedback
+  embedding    Unsupported("vector(1536)")?
+
+  @@index([repoName, filePath], name: "episodic_memory_repo_file_idx")
+  @@index([findingHash], name: "episodic_memory_hash_idx")
+  @@map("episodic_memory")
+}

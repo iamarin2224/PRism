@@ -28,3 +28,7 @@ numpy>=2.0.0
 e2b>=1.0.0
 e2b-code-interpreter>=1.0.0
 pytest==8.3.5
+langgraph>=0.2.0
+arq>=0.26.0
+redis>=5.0.0
+langchain-openai>=0.2.0

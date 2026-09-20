@@ -193,8 +193,11 @@ logs/
 secrets/
 
 # ============================================================
-# Others
+# Markdown Files (Ignore all .md files except README.md)
 # ============================================================
-roadmap.md
-AGENTS.md
-CLAUDE.md
+*.md
+**/*.md
+!README.md
+!**/README.md
+!readme.md
+!**/readme.md
