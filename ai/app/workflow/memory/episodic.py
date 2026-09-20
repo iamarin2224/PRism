@@ -13,7 +13,7 @@ logger = logging.getLogger("prism.workflow.memory.episodic")
 
 class EpisodicMemoryService:
     """
-    Episodic Memory Subsystem (Phase 5.3):
+    Episodic Memory Subsystem:
     Stores and retrieves historical human PR review feedback, accepted findings,
     and dismissed false positives via Neon PostgreSQL and pgvector.
     """

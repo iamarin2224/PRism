@@ -165,9 +165,10 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
             logger.warning(f"[{self.name}] Failed to parse findings from output: {e}. Raw content: {raw_content[:200]}")
             return []
 
-    async def execute(self, state: ReviewState) -> SpecialistOutput:
+    async def execute(self, state: ReviewState, max_tool_turns: int = 5) -> SpecialistOutput:
         """
-        Executes the specialist against the PR review state using the configured model tier.
+        Executes the specialist against the PR review state using the configured model tier
+        with an autonomous multi-turn tool calling loop.
         """
         start_time = time.perf_counter()
         logger.info(f"[{state['review_run_id']}] Specialist '{self.name}' starting execution...")
@@ -181,22 +182,80 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
             client, model_id = model_router.get_async_client(self.name)
             user_prompt = self.build_user_prompt(state)
 
-            response = await client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.1,
+            # Build tools for this specialist
+            agent_tools = self.get_tools_for_agent()
+            openai_tools = [t.to_openai_tool() for t in agent_tools] if agent_tools else None
+
+            # Tool Context for execution
+            from app.tools.context import ToolContext
+            tool_context = ToolContext(
+                repository=state.get("repo_name", ""),
+                commit_sha=state.get("commit_sha", ""),
+                pr_number=state.get("pr_number"),
+                base_sha=state.get("base_sha"),
             )
 
-            if response.usage:
-                tokens_in = response.usage.prompt_tokens or 0
-                tokens_out = response.usage.completion_tokens or 0
+            messages: List[Dict[str, Any]] = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
 
-            choice = response.choices[0] if response.choices else None
-            raw_content = choice.message.content if choice and choice.message else ""
-            findings = self.parse_findings(raw_content or "")
+            turn = 0
+            while turn < max_tool_turns:
+                turn += 1
+                kwargs: Dict[str, Any] = {
+                    "model": model_id,
+                    "messages": messages,
+                    "temperature": 0.1,
+                }
+                if openai_tools:
+                    kwargs["tools"] = openai_tools
+
+                response = await client.chat.completions.create(**kwargs)
+
+                if response.usage:
+                    tokens_in += response.usage.prompt_tokens or 0
+                    tokens_out += response.usage.completion_tokens or 0
+
+                choice = response.choices[0] if response.choices else None
+                if not choice or not choice.message:
+                    break
+
+                message = choice.message
+                tool_calls = getattr(message, "tool_calls", None)
+
+                # If no tool calls requested, we have the final answer
+                if not tool_calls:
+                    raw_content = message.content or ""
+                    findings = self.parse_findings(raw_content)
+                    break
+
+                # Append assistant tool calls to message history
+                messages.append(message.model_dump())
+
+                # Execute requested tools concurrently or sequentially
+                for tool_call in tool_calls:
+                    fn_name = tool_call.function.name
+                    fn_args_raw = tool_call.function.arguments or "{}"
+                    tool_instance = tool_registry.get_tool(fn_name)
+
+                    if not tool_instance:
+                        tool_res_str = json.dumps({"error": f"Tool '{fn_name}' not recognized."})
+                    else:
+                        try:
+                            args_dict = json.loads(fn_args_raw) if isinstance(fn_args_raw, str) else fn_args_raw
+                            parsed_params = tool_instance.input_schema(**args_dict)
+                            tool_result = await tool_instance.execute(parsed_params, tool_context)
+                            tool_res_str = json.dumps(tool_result.model_dump())
+                        except Exception as tool_err:
+                            logger.warning(f"[{self.name}] Tool {fn_name} execution failed: {tool_err}")
+                            tool_res_str = json.dumps({"error": str(tool_err)})
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_res_str,
+                    })
 
         except Exception as e:
             logger.error(f"[{state['review_run_id']}] Specialist '{self.name}' error: {e}", exc_info=True)

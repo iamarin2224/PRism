@@ -38,24 +38,24 @@ class ModelRouter:
         Returns (model_id, base_url, api_key) for the given tier.
         """
         if tier == "high":
-            api_key = settings.AICREDITS_API_KEY or settings.OPENROUTER_API_KEY
+            api_key = settings.AICREDITS_API_KEY
             base_url = settings.AICREDITS_BASE_URL
             model = settings.HIGH_MODEL
             return model, base_url, api_key
         elif tier == "mid":
-            api_key = settings.AICREDITS_API_KEY or settings.OPENROUTER_API_KEY
+            api_key = settings.AICREDITS_API_KEY
             base_url = settings.AICREDITS_BASE_URL
             model = settings.MID_MODEL
             return model, base_url, api_key
         elif tier == "free":
-            api_key = settings.OPENROUTER_API_KEY or settings.AICREDITS_API_KEY
+            api_key = settings.OPENROUTER_API_KEY
             base_url = settings.OPENROUTER_BASE_URL
             model = settings.OPENROUTER_MODEL
             return model, base_url, api_key
         else:
-            api_key = settings.AICREDITS_API_KEY or settings.OPENROUTER_API_KEY
-            base_url = settings.AICREDITS_BASE_URL
-            model = settings.MID_MODEL
+            api_key = settings.OPENROUTER_API_KEY
+            base_url = settings.OPENROUTER_BASE_URL
+            model = settings.OPENROUTER_MODEL
             return model, base_url, api_key
 
     def get_chat_model(

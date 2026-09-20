@@ -103,6 +103,7 @@ def test_specialist_nodes_execution_mocked():
 
     # Mock raw response
     mock_choice = MagicMock()
+    mock_choice.message.tool_calls = None
     mock_choice.message.content = """
     [
       {
@@ -154,3 +155,66 @@ def test_specialist_nodes_execution_mocked():
         docs_out = asyncio.run(docs_specialist_node(state))
         assert len(docs_out["specialist_results"]) == 1
         assert docs_out["specialist_results"][0].specialist_name == "docs"
+
+
+def test_specialist_multi_turn_tool_calling():
+    state = create_initial_review_state(
+        review_run_id="run-tool-call",
+        repo_name="iamarin2224/PRism",
+        pr_number=202,
+        commit_sha="c202",
+    )
+
+    # 1. First turn: LLM requests a tool call (read_file)
+    mock_tool_call = MagicMock()
+    mock_tool_call.id = "call_abc123"
+    mock_tool_call.function.name = "read_file"
+    mock_tool_call.function.arguments = '{"file_path": "src/auth/jwt.py"}'
+
+    turn1_choice = MagicMock()
+    turn1_choice.message.tool_calls = [mock_tool_call]
+    turn1_choice.message.model_dump.return_value = {
+        "role": "assistant",
+        "tool_calls": [{"id": "call_abc123", "type": "function", "function": {"name": "read_file", "arguments": '{"file_path": "src/auth/jwt.py"}'}}],
+    }
+
+    turn1_resp = MagicMock()
+    turn1_resp.choices = [turn1_choice]
+    turn1_resp.usage = MagicMock(prompt_tokens=100, completion_tokens=20)
+
+    # 2. Second turn: LLM returns final findings
+    turn2_choice = MagicMock()
+    turn2_choice.message.tool_calls = None
+    turn2_choice.message.content = """
+    [
+      {
+        "file_path": "src/auth/jwt.py",
+        "start_line": 10,
+        "end_line": 12,
+        "category": "security",
+        "severity": "high",
+        "title": "Unvalidated Secret",
+        "description": "JWT secret is hardcoded.",
+        "suggestion": "Use os.environ",
+        "confidence": 0.92
+      }
+    ]
+    """
+
+    turn2_resp = MagicMock()
+    turn2_resp.choices = [turn2_choice]
+    turn2_resp.usage = MagicMock(prompt_tokens=150, completion_tokens=40)
+
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(side_effect=[turn1_resp, turn2_resp])
+
+    with patch.object(model_router, "get_async_client", return_value=(mock_client, "deepseek/deepseek-v4.1-flash")):
+        with patch("app.tools.code.read_file.read_file_tool.execute", AsyncMock(return_value=MagicMock(model_dump=lambda: {"success": True, "data": {"content": "SECRET = '123'"}}))):
+            output = asyncio.run(security_agent.execute(state))
+
+            assert output.specialist_name == "security"
+            assert len(output.findings) == 1
+            assert output.findings[0].title == "Unvalidated Secret"
+            assert output.tokens_in == 250  # 100 + 150
+            assert output.tokens_out == 60  # 20 + 40
+            assert mock_client.chat.completions.create.call_count == 2
