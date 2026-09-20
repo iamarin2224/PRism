@@ -3,6 +3,12 @@ import time
 from typing import Any, Dict, List, Literal
 from app.models.review import Finding
 from app.rag import code_retriever
+from app.workflow.agents import (
+    docs_agent,
+    quality_agent,
+    security_agent,
+    tests_agent,
+)
 from app.workflow.memory import (
     episodic_memory_service,
     load_procedural_rules,
@@ -14,7 +20,7 @@ logger = logging.getLogger("prism.workflow.nodes")
 
 async def build_context_node(state: ReviewState) -> Dict[str, Any]:
     """
-    1. Context Construction Node (Phase 5.3):
+    1. Context Construction Node:
     Aggregates Semantic Memory (RAG), Procedural Memory (.prism/rules),
     and Episodic Memory (historical feedback) before specialist fan-out.
     Mandatory grounding ensuring no specialist runs blind.
@@ -67,76 +73,47 @@ async def build_context_node(state: ReviewState) -> Dict[str, Any]:
 
 async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.1 Security Specialist Agent Node (Phase 5.4):
+    2.1 Security Specialist Agent Node:
     Analyzes OWASP vulnerabilities, auth flaws, secrets, and injection risks.
     """
-    start_time = time.perf_counter()
     logger.info(f"[{state['review_run_id']}] Security specialist executing...")
-    # Specialist logic and tools are bound in 5.4
-    output = SpecialistOutput(
-        specialist_name="security",
-        findings=[],
-        tokens_in=0,
-        tokens_out=0,
-        execution_time_ms=(time.perf_counter() - start_time) * 1000,
-    )
+    output = await security_agent.execute(state)
     return {"specialist_results": [output]}
 
 
 async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.2 Quality Specialist Agent Node (Phase 5.4):
+    2.2 Quality Specialist Agent Node:
     Analyzes code design, anti-patterns, performance, and maintainability.
     """
-    start_time = time.perf_counter()
     logger.info(f"[{state['review_run_id']}] Quality specialist executing...")
-    output = SpecialistOutput(
-        specialist_name="quality",
-        findings=[],
-        tokens_in=0,
-        tokens_out=0,
-        execution_time_ms=(time.perf_counter() - start_time) * 1000,
-    )
+    output = await quality_agent.execute(state)
     return {"specialist_results": [output]}
 
 
 async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.3 Tests Specialist Agent Node (Phase 5.4):
+    2.3 Tests Specialist Agent Node:
     Analyzes regression risk, test coverage, and sandbox verification.
     """
-    start_time = time.perf_counter()
     logger.info(f"[{state['review_run_id']}] Tests specialist executing...")
-    output = SpecialistOutput(
-        specialist_name="tests",
-        findings=[],
-        tokens_in=0,
-        tokens_out=0,
-        execution_time_ms=(time.perf_counter() - start_time) * 1000,
-    )
+    output = await tests_agent.execute(state)
     return {"specialist_results": [output]}
 
 
 async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.4 Documentation Specialist Agent Node (Phase 5.4):
+    2.4 Documentation Specialist Agent Node:
     Analyzes API contracts, comments, breaking changes, and documentation completeness.
     """
-    start_time = time.perf_counter()
     logger.info(f"[{state['review_run_id']}] Docs specialist executing...")
-    output = SpecialistOutput(
-        specialist_name="docs",
-        findings=[],
-        tokens_in=0,
-        tokens_out=0,
-        execution_time_ms=(time.perf_counter() - start_time) * 1000,
-    )
+    output = await docs_agent.execute(state)
     return {"specialist_results": [output]}
 
 
 async def aggregate_and_deduplicate_node(state: ReviewState) -> Dict[str, Any]:
     """
-    3. Aggregation & Deduplication Node (Phase 5.5):
+    3. Aggregation & Deduplication Node:
     Pure-Python deterministic merge matching findings by file path and overlapping
     line ranges, tracking cross-specialist agreement.
     """
@@ -168,7 +145,7 @@ async def aggregate_and_deduplicate_node(state: ReviewState) -> Dict[str, Any]:
 
 async def critic_verifier_node(state: ReviewState) -> Dict[str, Any]:
     """
-    4. Critic / Verifier Node (Phase 5.5):
+    4. Critic / Verifier Node:
     Validates candidate findings against retrieved code context to eliminate
     hallucinations and false positives.
     """
@@ -185,7 +162,7 @@ def confidence_severity_gate_router(
     state: ReviewState,
 ) -> Literal["post_review_github", "human_approval_queue"]:
     """
-    5. Confidence & Severity Gate Router (Phase 5.5):
+    5. Confidence & Severity Gate Router:
     Evaluates verified findings and decides whether to post directly or pause for HITL review.
     - If any finding is CRITICAL or confidence < 0.85 -> "human_approval_queue"
     - Otherwise -> "post_review_github"
@@ -202,7 +179,7 @@ def confidence_severity_gate_router(
 
 async def post_review_github_node(state: ReviewState) -> Dict[str, Any]:
     """
-    6. Post Review Node (Phase 5.5):
+    6. Post Review Node:
     Posts the final structured review comments to GitHub via API.
     """
     logger.info(f"[{state['review_run_id']}] Posting review to GitHub for PR #{state['pr_number']}")
@@ -214,7 +191,7 @@ async def post_review_github_node(state: ReviewState) -> Dict[str, Any]:
 
 async def human_approval_queue_node(state: ReviewState) -> Dict[str, Any]:
     """
-    7. Human Approval Queue Node (Phase 5.5):
+    7. Human Approval Queue Node:
     Marks workflow state as awaiting human review in the web dashboard.
     """
     logger.info(f"[{state['review_run_id']}] Workflow paused awaiting human approval.")
@@ -226,7 +203,7 @@ async def human_approval_queue_node(state: ReviewState) -> Dict[str, Any]:
 
 async def resume_after_human_approval_node(state: ReviewState) -> Dict[str, Any]:
     """
-    8. Resume Node (Phase 5.5):
+    8. Resume Node:
     Executes after human approval has been granted from dashboard.
     """
     logger.info(f"[{state['review_run_id']}] Workflow resumed from human approval.")

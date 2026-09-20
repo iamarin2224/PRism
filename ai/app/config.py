@@ -18,11 +18,13 @@ class Settings(BaseSettings):
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = "openrouter/free"
 
-    # AICredits Embedding Settings
+    # AICredits Text Generation / LLM Routing Settings
     AICREDITS_API_KEY: str = ""
     AICREDITS_BASE_URL: str = "https://api.aicredits.in/v1"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSION: int = 1536
+    MID_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
+    HIGH_MODEL: str = "deepseek/deepseek-v4.1-flash"
 
 
     # GitHub API Token (optional fallback for rate limits)
