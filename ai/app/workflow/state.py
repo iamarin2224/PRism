@@ -45,6 +45,7 @@ class ReviewState(TypedDict):
     total_tokens_in: int
     total_tokens_out: int
     total_cost_usd: float
+    review_summary_markdown: Optional[str]
     errors: Annotated[List[str], operator.add]
 
 
@@ -77,5 +78,6 @@ def create_initial_review_state(
         "total_tokens_in": 0,
         "total_tokens_out": 0,
         "total_cost_usd": 0.0,
+        "review_summary_markdown": None,
         "errors": [],
     }
