@@ -101,11 +101,22 @@ async def init_db() -> None:
             CREATE INDEX IF NOT EXISTS repositories_full_name_idx ON repositories (full_name);
         """)
 
-        # Create HNSW index on vector column using vector_cosine_ops
-        # (avoiding sequential table scans during cosine distance similarity search)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS code_chunks_embedding_hnsw_idx 
-            ON code_chunks USING hnsw (embedding vector_cosine_ops);
+        # Create episodic_memory table for Phase 5 historical human feedback
+        await conn.execute(f"""
+            CREATE TABLE IF NOT EXISTS episodic_memory (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                repo_name TEXT NOT NULL,
+                pr_number INT NOT NULL,
+                finding_hash TEXT NOT NULL,
+                feedback_type TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                comment TEXT,
+                embedding vector({settings.EMBEDDING_DIMENSION}),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS episodic_memory_repo_file_idx ON episodic_memory (repo_name, file_path);
+            CREATE INDEX IF NOT EXISTS episodic_memory_hash_idx ON episodic_memory (finding_hash);
         """)
 
         logger.info("Database schema and HNSW vector indexes verified.")
