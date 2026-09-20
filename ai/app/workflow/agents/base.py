@@ -16,7 +16,8 @@ class BaseSpecialistAgent(ABC):
     """
     Abstract Base Class for Multi-Agent PR Review Specialists.
     Each specialist encapsulates domain-specific system instructions,
-    access to tools, structured schema parsing, and execution telemetry.
+    access to tools, structured schema parsing, execution telemetry,
+    and automatic credit exhaustion fallback to OpenRouter free tier.
     """
 
     def __init__(
@@ -142,16 +143,28 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
             if not isinstance(data, list):
                 return []
 
+            category_map = {
+                "security": "security",
+                "quality": "code_quality",
+                "tests": "test_coverage",
+                "docs": "documentation",
+            }
+            default_cat = category_map.get(self.name, "code_quality")
+
             findings = []
             for item in data:
                 if not isinstance(item, dict):
                     continue
-                # Ensure mandatory fields
+                # Map raw category to valid schema category if necessary
+                cat = item.get("category", default_cat)
+                if cat in category_map:
+                    cat = category_map[cat]
+
                 finding = Finding(
                     file_path=item.get("file_path", "unknown"),
                     start_line=item.get("start_line"),
                     end_line=item.get("end_line"),
-                    category=item.get("category", self.name),
+                    category=cat,
                     severity=item.get("severity", "medium").lower(),
                     title=item.get("title", "Review Finding"),
                     description=item.get("description", ""),
@@ -165,10 +178,82 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
             logger.warning(f"[{self.name}] Failed to parse findings from output: {e}. Raw content: {raw_content[:200]}")
             return []
 
+    async def _run_llm_turn(
+        self,
+        client: Any,
+        model_id: str,
+        messages: List[Dict[str, Any]],
+        openai_tools: Optional[List[Dict[str, Any]]],
+        tool_context: Any,
+        max_tool_turns: int,
+    ) -> Tuple[List[Finding], int, int]:
+        tokens_in = 0
+        tokens_out = 0
+        findings: List[Finding] = []
+
+        turn = 0
+        while turn < max_tool_turns:
+            turn += 1
+            kwargs: Dict[str, Any] = {
+                "model": model_id,
+                "messages": messages,
+                "temperature": 0.1,
+            }
+            if openai_tools:
+                kwargs["tools"] = openai_tools
+
+            response = await client.chat.completions.create(**kwargs)
+
+            if response.usage:
+                tokens_in += response.usage.prompt_tokens or 0
+                tokens_out += response.usage.completion_tokens or 0
+
+            choice = response.choices[0] if response.choices else None
+            if not choice or not choice.message:
+                break
+
+            message = choice.message
+            tool_calls = getattr(message, "tool_calls", None)
+
+            # If no tool calls requested, we have the final answer
+            if not tool_calls:
+                raw_content = message.content or ""
+                findings = self.parse_findings(raw_content)
+                break
+
+            # Append assistant tool calls to message history
+            messages.append(message.model_dump())
+
+            # Execute requested tools
+            for tool_call in tool_calls:
+                fn_name = tool_call.function.name
+                fn_args_raw = tool_call.function.arguments or "{}"
+                tool_instance = tool_registry.get_tool(fn_name)
+
+                if not tool_instance:
+                    tool_res_str = json.dumps({"error": f"Tool '{fn_name}' not recognized."})
+                else:
+                    try:
+                        args_dict = json.loads(fn_args_raw) if isinstance(fn_args_raw, str) else fn_args_raw
+                        parsed_params = tool_instance.input_schema(**args_dict)
+                        tool_result = await tool_instance.execute(parsed_params, tool_context)
+                        tool_res_str = json.dumps(tool_result.model_dump())
+                    except Exception as tool_err:
+                        logger.warning(f"[{self.name}] Tool {fn_name} execution failed: {tool_err}")
+                        tool_res_str = json.dumps({"error": str(tool_err)})
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_res_str,
+                })
+
+        return findings, tokens_in, tokens_out
+
     async def execute(self, state: ReviewState, max_tool_turns: int = 5) -> SpecialistOutput:
         """
-        Executes the specialist against the PR review state using the configured model tier
-        with an autonomous multi-turn tool calling loop.
+        Executes the specialist against the PR review state using the configured model tier.
+        Gracefully handles credit exhaustion by falling back to OpenRouter free tier.
         """
         start_time = time.perf_counter()
         logger.info(f"[{state['review_run_id']}] Specialist '{self.name}' starting execution...")
@@ -178,88 +263,48 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
         findings: List[Finding] = []
         error_msg: Optional[str] = None
 
+        agent_tools = self.get_tools_for_agent()
+        openai_tools = [t.to_openai_tool() for t in agent_tools] if agent_tools else None
+
+        from app.tools.context import ToolContext
+        tool_context = ToolContext(
+            repository=state.get("repo_name", ""),
+            commit_sha=state.get("commit_sha", ""),
+            pr_number=state.get("pr_number"),
+            base_sha=state.get("base_sha"),
+        )
+
+        user_prompt = self.build_user_prompt(state)
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
         try:
             client, model_id = model_router.get_async_client(self.name)
-            user_prompt = self.build_user_prompt(state)
-
-            # Build tools for this specialist
-            agent_tools = self.get_tools_for_agent()
-            openai_tools = [t.to_openai_tool() for t in agent_tools] if agent_tools else None
-
-            # Tool Context for execution
-            from app.tools.context import ToolContext
-            tool_context = ToolContext(
-                repository=state.get("repo_name", ""),
-                commit_sha=state.get("commit_sha", ""),
-                pr_number=state.get("pr_number"),
-                base_sha=state.get("base_sha"),
+            findings, tokens_in, tokens_out = await self._run_llm_turn(
+                client, model_id, messages.copy(), openai_tools, tool_context, max_tool_turns
             )
 
-            messages: List[Dict[str, Any]] = [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-
-            turn = 0
-            while turn < max_tool_turns:
-                turn += 1
-                kwargs: Dict[str, Any] = {
-                    "model": model_id,
-                    "messages": messages,
-                    "temperature": 0.1,
-                }
-                if openai_tools:
-                    kwargs["tools"] = openai_tools
-
-                response = await client.chat.completions.create(**kwargs)
-
-                if response.usage:
-                    tokens_in += response.usage.prompt_tokens or 0
-                    tokens_out += response.usage.completion_tokens or 0
-
-                choice = response.choices[0] if response.choices else None
-                if not choice or not choice.message:
-                    break
-
-                message = choice.message
-                tool_calls = getattr(message, "tool_calls", None)
-
-                # If no tool calls requested, we have the final answer
-                if not tool_calls:
-                    raw_content = message.content or ""
-                    findings = self.parse_findings(raw_content)
-                    break
-
-                # Append assistant tool calls to message history
-                messages.append(message.model_dump())
-
-                # Execute requested tools concurrently or sequentially
-                for tool_call in tool_calls:
-                    fn_name = tool_call.function.name
-                    fn_args_raw = tool_call.function.arguments or "{}"
-                    tool_instance = tool_registry.get_tool(fn_name)
-
-                    if not tool_instance:
-                        tool_res_str = json.dumps({"error": f"Tool '{fn_name}' not recognized."})
-                    else:
-                        try:
-                            args_dict = json.loads(fn_args_raw) if isinstance(fn_args_raw, str) else fn_args_raw
-                            parsed_params = tool_instance.input_schema(**args_dict)
-                            tool_result = await tool_instance.execute(parsed_params, tool_context)
-                            tool_res_str = json.dumps(tool_result.model_dump())
-                        except Exception as tool_err:
-                            logger.warning(f"[{self.name}] Tool {fn_name} execution failed: {tool_err}")
-                            tool_res_str = json.dumps({"error": str(tool_err)})
-
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_res_str,
-                    })
-
-        except Exception as e:
-            logger.error(f"[{state['review_run_id']}] Specialist '{self.name}' error: {e}", exc_info=True)
-            error_msg = str(e)
+        except Exception as primary_err:
+            # Check for credit exhaustion or unexpected API failure
+            if model_router.is_credit_exhaustion_error(primary_err):
+                logger.warning(
+                    f"[{state['review_run_id']}] Specialist '{self.name}' encountered credit exhaustion: {primary_err}. "
+                    f"Retrying with OpenRouter free tier fallback..."
+                )
+                model_router.mark_aicredits_exhausted(str(primary_err))
+                try:
+                    fallback_client, fallback_model = model_router.get_async_client(self.name, force_fallback=True)
+                    findings, tokens_in, tokens_out = await self._run_llm_turn(
+                        fallback_client, fallback_model, messages.copy(), openai_tools, tool_context, max_tool_turns
+                    )
+                except Exception as fallback_err:
+                    logger.error(f"[{state['review_run_id']}] Specialist '{self.name}' fallback failed: {fallback_err}", exc_info=True)
+                    error_msg = f"Primary failed ({primary_err}); Fallback failed ({fallback_err})"
+            else:
+                logger.error(f"[{state['review_run_id']}] Specialist '{self.name}' error: {primary_err}", exc_info=True)
+                error_msg = str(primary_err)
 
         exec_time_ms = (time.perf_counter() - start_time) * 1000
         logger.info(

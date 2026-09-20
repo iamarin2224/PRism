@@ -39,7 +39,26 @@ class CriticVerifierService:
     """
     Critic / Verifier Node:
     Invokes the High Tier LLM to double-check candidate findings against the raw code context.
+    Eliminates hallucinations and falls back gracefully to OpenRouter if credits are exhausted.
     """
+
+    async def _call_critic_api(
+        self,
+        client: Any,
+        model_id: str,
+        user_prompt: str,
+    ) -> List[Dict[str, Any]]:
+        response = await client.chat.completions.create(
+            model=model_id,
+            messages=[
+                {"role": "system", "content": CRITIC_SYSTEM_PROMPT.strip()},
+                {"role": "user", "content": user_prompt.strip()},
+            ],
+            temperature=0.0,
+        )
+        choice = response.choices[0] if response.choices else None
+        raw = choice.message.content if choice and choice.message else ""
+        return self._parse_verdicts(raw or "")
 
     async def verify_findings(
         self,
@@ -51,7 +70,6 @@ class CriticVerifierService:
 
         logger.info(f"[{state['review_run_id']}] Critic verifying {len(findings)} candidate findings...")
 
-        # Build verification payload
         diff_summary = state.get("diff_summary", {})
         files_content = diff_summary.get("files_content", {})
 
@@ -84,21 +102,29 @@ class CriticVerifierService:
 Audit each finding with adversarial precision. Return the JSON array of verdicts.
 """
 
+        verdicts: List[Dict[str, Any]] = []
+
         try:
             client, model_id = model_router.get_async_client("critic")
-            response = await client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "system", "content": CRITIC_SYSTEM_PROMPT.strip()},
-                    {"role": "user", "content": user_prompt.strip()},
-                ],
-                temperature=0.0,
-            )
+            verdicts = await self._call_critic_api(client, model_id, user_prompt)
 
-            choice = response.choices[0] if response.choices else None
-            raw = choice.message.content if choice and choice.message else ""
-            verdicts = self._parse_verdicts(raw or "")
+        except Exception as e:
+            if model_router.is_credit_exhaustion_error(e):
+                logger.warning(
+                    f"[{state['review_run_id']}] Critic encountered credit exhaustion: {e}. "
+                    f"Retrying with OpenRouter free tier fallback..."
+                )
+                model_router.mark_aicredits_exhausted(str(e))
+                try:
+                    fallback_client, fallback_model = model_router.get_async_client("critic", force_fallback=True)
+                    verdicts = await self._call_critic_api(fallback_client, fallback_model, user_prompt)
+                except Exception as fb_err:
+                    logger.warning(f"[{state['review_run_id']}] Critic fallback failed: {fb_err}")
+            else:
+                logger.warning(f"[{state['review_run_id']}] Critic verification error: {e}")
 
+        # If verdicts were returned, filter candidates
+        if verdicts:
             verified: List[Finding] = []
             verdict_map = {v.get("index"): v for v in verdicts if isinstance(v, dict)}
 
@@ -113,18 +139,14 @@ Audit each finding with adversarial precision. Return the JSON array of verdicts
                     else:
                         logger.info(f"[{state['review_run_id']}] Critic rejected finding: '{candidate.title}' on {candidate.file_path}")
                 else:
-                    # Fallback: keep candidate if no explicit rejection
                     candidate.is_verified = True
                     verified.append(candidate)
-
             return verified
 
-        except Exception as e:
-            logger.warning(f"[{state['review_run_id']}] Critic verification fallback: {e}")
-            # In case of verification error, mark as unverified but keep candidates
-            for f in findings:
-                f.is_verified = False
-            return findings
+        # Graceful fallback: If critic call fails or produces no verdicts, preserve candidates with unverified flag
+        for f in findings:
+            f.is_verified = False
+        return findings
 
     @staticmethod
     def _parse_verdicts(raw_content: str) -> List[Dict[str, Any]]:

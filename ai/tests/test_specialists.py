@@ -21,6 +21,7 @@ from app.workflow.state import create_initial_review_state
 
 
 def test_model_router_tier_resolution():
+    model_router.reset_quota_status()
     # Role tier resolution
     assert model_router.get_tier_for_role("security") == "high"
     assert model_router.get_tier_for_role("critic") == "high"
