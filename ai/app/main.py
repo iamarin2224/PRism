@@ -2,12 +2,17 @@ import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.models.github import PREventPayload
+from app.queue import (
+    check_and_set_delivery_idempotency,
+    close_redis,
+    enqueue_review_job,
+)
 from app.models.review import (
     LLMResponse,
     ReviewRequest,
@@ -42,6 +47,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"Database initialization warning: {e}")
     yield
     await close_db_pool()
+    await close_redis()
 
 
 app = FastAPI(title="PRism AI Service", version="0.3.0", lifespan=lifespan)
@@ -125,19 +131,46 @@ def test_structured_output(request: StructuredTestRequest = StructuredTestReques
 # ============================================================
 
 @app.post("/api/github/pr-event")
-def receive_github_pr_event(event: PREventPayload):
+async def receive_github_pr_event(
+    event: PREventPayload,
+    response: Response,
+    x_github_delivery: Optional[str] = Header(None, alias="X-GitHub-Delivery"),
+):
     """
-    Receive and validate pull request webhook event forwarded from the Next.js backend.
+    Asynchronous GitHub Webhook Ingress (Phase 5.1):
+    - Validates PREventPayload schema.
+    - Atomically enforces idempotency on X-GitHub-Delivery via Redis.
+    - Fast-dispatches background review task to Redis + ARQ queue.
+    - Returns immediate HTTP 202 Accepted.
     """
     repo_name = event.repository.fullName if event.repository else "unknown"
     pr_num = event.pullRequest.number if event.pullRequest else "unknown"
 
+    # 1. Enforce atomic idempotency on GitHub delivery ID
+    if x_github_delivery:
+        is_new_delivery = await check_and_set_delivery_idempotency(x_github_delivery)
+        if not is_new_delivery:
+            logger.info(f"Duplicate GitHub delivery '{x_github_delivery}' ignored.")
+            return {
+                "status": "already_processed",
+                "delivery_id": x_github_delivery,
+                "repo": repo_name,
+                "prNumber": pr_num,
+                "action": event.action,
+            }
+
+    # 2. Dispatch to background ARQ job queue
+    job_id = await enqueue_review_job(event, x_github_delivery)
+
+    # 3. Fast non-blocking HTTP 202 Accepted return
+    response.status_code = status.HTTP_202_ACCEPTED
     return {
-        "status": "received",
-        "message": f"FastAPI received PR #{pr_num} ({event.action}) for {repo_name}",
-        "action": event.action,
+        "status": "queued",
+        "job_id": job_id,
+        "delivery_id": x_github_delivery,
         "repo": repo_name,
         "prNumber": pr_num,
+        "action": event.action,
     }
 
 # ============================================================

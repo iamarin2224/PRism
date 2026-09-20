@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = ""
 
+    # Redis & Asynchronous Job Queue Settings
+    REDIS_URL: str = "redis://localhost:6379"
+
     # CORS configuration with fallback defaults (Next.js runs on port 5050)
     NEXTJS_URL: str = "http://localhost:5050"
     FRONTEND_URL: str = "http://localhost:5050"
