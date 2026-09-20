@@ -95,8 +95,8 @@ def test_full_workflow_end_to_end_auto_post():
 
     engine = LangGraphWorkflowEngine()
 
-    with patch("app.workflow.nodes.code_retriever.retrieve", AsyncMock(return_value=mock_rag)), \
-         patch("app.workflow.nodes.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=[])), \
+    with patch("app.workflow.nodes.context.code_retriever.retrieve", AsyncMock(return_value=mock_rag)), \
+         patch("app.workflow.nodes.context.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=[])), \
          patch("app.workflow.events.spine.events_spine.emit_event", AsyncMock(return_value="evt-123")), \
          patch("app.services.model_router.model_router.get_async_client", return_value=(mock_client, "mock-model")):
 
@@ -176,8 +176,8 @@ def test_full_workflow_end_to_end_human_approval():
 
     engine = LangGraphWorkflowEngine()
 
-    with patch("app.workflow.nodes.code_retriever.retrieve", AsyncMock(return_value=mock_rag)), \
-         patch("app.workflow.nodes.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=[])), \
+    with patch("app.workflow.nodes.context.code_retriever.retrieve", AsyncMock(return_value=mock_rag)), \
+         patch("app.workflow.nodes.context.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=[])), \
          patch("app.workflow.events.spine.events_spine.emit_event", AsyncMock(return_value="evt-456")), \
          patch("app.services.model_router.model_router.get_async_client", return_value=(mock_client, "mock-model")):
 

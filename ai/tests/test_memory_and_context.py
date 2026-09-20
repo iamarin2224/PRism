@@ -114,8 +114,8 @@ def test_build_context_node_multi_source_grounding():
         }
     ]
 
-    with patch("app.workflow.nodes.code_retriever.retrieve", AsyncMock(return_value=mock_retrieval_res)), \
-         patch("app.workflow.nodes.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=mock_episodic_data)):
+    with patch("app.workflow.nodes.context.code_retriever.retrieve", AsyncMock(return_value=mock_retrieval_res)), \
+         patch("app.workflow.nodes.context.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=mock_episodic_data)):
 
         update = asyncio.run(build_context_node(state))
 
