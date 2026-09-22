@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.models.review import Finding
 from app.services.model_router import SpecialistRole, model_router
@@ -45,22 +45,14 @@ class BaseSpecialistAgent(ABC):
     def build_user_prompt(self, state: ReviewState) -> str:
         """
         Synthesizes repository context, diff, procedural rules, and episodic feedback into prompt.
+        Consumes the enriched Semantic Memory (PR metadata, diffs, and retrieved repository code).
         """
         pr_title = state.get("pr_metadata", {}).get("title", "Unknown Title")
         pr_body = state.get("pr_metadata", {}).get("body", "No description provided.")
         repo_name = state.get("repo_name", "")
         pr_number = state.get("pr_number", 0)
 
-        # Diff and files
-        diff_summary = state.get("diff_summary", {})
-        files_content = diff_summary.get("files_content", {})
-
-        diff_text_blocks = []
-        for file_path, content in files_content.items():
-            diff_text_blocks.append(f"--- File: {file_path} ---\n{content}\n")
-        all_diff_text = "\n".join(diff_text_blocks) if diff_text_blocks else "No diff available."
-
-        # Procedural Rules
+        # 1. Procedural Rules
         relevant_rules = [
             f"- [{r.get('id', 'RULE')}] ({r.get('domain', 'general')} - {r.get('severity', 'medium')}): {r.get('title', '')} - {r.get('description', '')}"
             for r in state.get("procedural_rules", [])
@@ -68,19 +60,56 @@ class BaseSpecialistAgent(ABC):
         ]
         rules_text = "\n".join(relevant_rules) if relevant_rules else "Standard engineering standards apply."
 
-        # Episodic Feedback
+        # 2. Episodic Feedback
         past_feedback = [
             f"- Past PR #{e.get('pr_number')}: Finding '{e.get('title')}' on {e.get('file_path')} was marked {e.get('feedback_type')}. Context: {e.get('comment', '')}"
             for e in state.get("episodic_context", [])
         ]
         feedback_text = "\n".join(past_feedback) if past_feedback else "No prior recorded human feedback for these patterns."
 
-        # Semantic context
-        semantic_chunks = [
-            f"- From {c.get('file_path')} (lines {c.get('start_line')}-{c.get('end_line')}):\n{c.get('content')}"
-            for c in state.get("semantic_context", [])
-        ]
-        semantic_text = "\n\n".join(semantic_chunks) if semantic_chunks else "No additional semantic context outside diff."
+        # 3. Semantic Context: Extract PR code changes and retrieved repository chunks
+        semantic_data = state.get("semantic_context") or {}
+        all_diff_text = "No diff available."
+        semantic_text = "No additional semantic context outside diff."
+
+        if isinstance(semantic_data, dict):
+            pr_sem = semantic_data.get("pr", {})
+            repo_sem = semantic_data.get("repository", {})
+
+            # Extract PR changes from semantic context
+            pr_changes = pr_sem.get("changes", [])
+            if pr_changes:
+                diff_text_blocks = []
+                for ch in pr_changes:
+                    fpath = ch.get("file_path", "")
+                    content = ch.get("content", "")
+                    diff_text_blocks.append(f"--- File: {fpath} ---\n{content}\n")
+                all_diff_text = "\n".join(diff_text_blocks)
+            elif state.get("diff_summary", {}).get("files_content"):
+                # Fallback to diff_summary if semantic_context has not been populated
+                files_content = state["diff_summary"]["files_content"]
+                diff_text_blocks = [f"--- File: {fpath} ---\n{content}\n" for fpath, content in files_content.items()]
+                all_diff_text = "\n".join(diff_text_blocks)
+
+            retrieved_chunks = repo_sem.get("retrieved_chunks", [])
+            if retrieved_chunks:
+                semantic_chunks_text = [
+                    f"- From {c.get('file_path')} (lines {c.get('start_line')}-{c.get('end_line')}):\n{c.get('content')}"
+                    for c in retrieved_chunks
+                ]
+                semantic_text = "\n\n".join(semantic_chunks_text)
+        elif isinstance(semantic_data, list):
+            # Backward compatibility if semantic_data is passed as raw list of chunks
+            if semantic_data:
+                semantic_chunks_text = [
+                    f"- From {c.get('file_path')} (lines {c.get('start_line')}-{c.get('end_line')}):\n{c.get('content')}"
+                    for c in semantic_data
+                ]
+                semantic_text = "\n\n".join(semantic_chunks_text)
+            if state.get("diff_summary", {}).get("files_content"):
+                files_content = state["diff_summary"]["files_content"]
+                diff_text_blocks = [f"--- File: {fpath} ---\n{content}\n" for fpath, content in files_content.items()]
+                all_diff_text = "\n".join(diff_text_blocks)
 
         prompt = f"""
 ## TARGET PULL REQUEST:
@@ -248,7 +277,36 @@ Respond strictly with valid JSON inside a ```json ... ``` block or raw JSON.
                     "content": tool_res_str,
                 })
 
+            # History Context Compaction:
+            # If multiple tool turns have executed, compact older tool responses to prevent runaway context growth
+            self._compact_tool_history(messages, keep_recent=2)
+
         return findings, tokens_in, tokens_out
+
+    @staticmethod
+    def _compact_tool_history(messages: List[Dict[str, Any]], keep_recent: int = 2) -> None:
+        """
+        Prunes/compacts older tool response messages in the ongoing LLM conversation.
+        Keeps the last `keep_recent` tool responses in full fidelity, and truncates older heavy tool
+        outputs to concise status receipts to prevent context explosion during multi-turn investigations.
+        """
+        tool_msg_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+        if len(tool_msg_indices) <= keep_recent:
+            return
+
+        to_compact = tool_msg_indices[:-keep_recent]
+        for idx in to_compact:
+            content = messages[idx].get("content", "")
+            if isinstance(content, str) and len(content) > 300:
+                try:
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        # Retain summary receipt metadata
+                        success = data.get("success", True)
+                        summary_note = f"[Tool output archived: success={success}, content_length={len(content)} chars. Information integrated into agent reasoning.]"
+                        messages[idx]["content"] = json.dumps({"status": "compacted", "note": summary_note})
+                except Exception:
+                    messages[idx]["content"] = "[Previous tool output archived to save context]"
 
     async def execute(self, state: ReviewState, max_tool_turns: int = 5) -> SpecialistOutput:
         """

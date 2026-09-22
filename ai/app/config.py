@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base directory for the AI service (PRism/ai)
@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 1536
     MID_MODEL: str = "qwen/qwen3-coder-30b-a3b-instruct"
     HIGH_MODEL: str = "deepseek/deepseek-v4.1-flash"
+
+    # Optional model pricing per 1M tokens (in INR / base currency)
+    HM_INPUT_COST: Optional[float] = None
+    HM_OUTPUT_COST: Optional[float] = None
+    MM_INPUT_COST: Optional[float] = None
+    MM_OUTPUT_COST: Optional[float] = None
 
 
     # GitHub API Token (optional fallback for rate limits)

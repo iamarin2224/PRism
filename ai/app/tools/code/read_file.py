@@ -110,7 +110,20 @@ class ReadFileTool(BaseTool[ReadFileInput]):
 
             # Apply 1-based line range slicing if specified
             start_l = params.start_line or 1
-            end_l = params.end_line or total_lines
+            MAX_WINDOW_LINES = 250
+            truncated = False
+
+            if params.start_line is not None and params.end_line is not None:
+                end_l = params.end_line
+            elif params.start_line is not None and params.end_line is None:
+                end_l = min(start_l + MAX_WINDOW_LINES - 1, total_lines)
+                if end_l < total_lines:
+                    truncated = True
+            else:
+                # No range specified: read first MAX_WINDOW_LINES
+                end_l = min(MAX_WINDOW_LINES, total_lines)
+                if end_l < total_lines:
+                    truncated = True
 
             if start_l > total_lines:
                 return ToolResult.fail(
@@ -123,8 +136,19 @@ class ReadFileTool(BaseTool[ReadFileInput]):
                     f"start_line ({start_l}) cannot be greater than end_line ({end_l})."
                 )
 
+            # Enforce max window clamp to prevent massive token dumps
+            if (end_l - start_l + 1) > MAX_WINDOW_LINES:
+                end_l = start_l + MAX_WINDOW_LINES - 1
+                truncated = True
+
             selected_lines = lines[start_l - 1 : end_l]
             content = "\n".join(selected_lines)
+            if truncated:
+                content += (
+                    f"\n\n... [Truncated: showing lines {start_l}-{end_l} of {total_lines}. "
+                    f"Use start_line={end_l + 1} and end_line={min(end_l + MAX_WINDOW_LINES, total_lines)} "
+                    f"or use find_references/search_codebase to inspect specific functions.] ..."
+                )
 
             _, lang_name = detect_language(norm_path)
 
@@ -136,6 +160,7 @@ class ReadFileTool(BaseTool[ReadFileInput]):
                     "start_line": start_l,
                     "end_line": end_l,
                     "total_lines": total_lines,
+                    "is_truncated": truncated,
                     "commit_sha": ref,
                 },
                 metadata={"total_file_lines": total_lines, "sliced_lines": len(selected_lines)},

@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict
+from app.config import settings
 from app.workflow.agents import (
     docs_agent,
     quality_agent,
@@ -21,7 +22,7 @@ async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
     output = await security_agent.execute(state)
 
     cost_inr = cost_calculator.calculate_cost_inr(
-        model_name="deepseek/deepseek-v4.1-flash",
+        model_name=settings.HIGH_MODEL,
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
     )
@@ -49,7 +50,7 @@ async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
     output = await quality_agent.execute(state)
 
     cost_inr = cost_calculator.calculate_cost_inr(
-        model_name="qwen/qwen3-coder-30b-a3b-instruct",
+        model_name=settings.MID_MODEL,
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
     )
@@ -77,7 +78,7 @@ async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
     output = await tests_agent.execute(state)
 
     cost_inr = cost_calculator.calculate_cost_inr(
-        model_name="qwen/qwen3-coder-30b-a3b-instruct",
+        model_name=settings.MID_MODEL,
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
     )
@@ -105,10 +106,11 @@ async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
     output = await docs_agent.execute(state)
 
     cost_inr = cost_calculator.calculate_cost_inr(
-        model_name="openrouter/free",
+        model_name=settings.OPENROUTER_MODEL,
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
     )
+
 
     await events_spine.emit_event(
         review_run_id=state["review_run_id"],

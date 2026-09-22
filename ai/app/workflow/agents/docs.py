@@ -28,7 +28,7 @@ class DocsSpecialistAgent(BaseSpecialistAgent):
             system_prompt=DOCS_SPECIALIST_SYSTEM_PROMPT.strip(),
             tool_names=[
                 "read_file",
-                "search_codebase",
+                "web_search",
                 "fetch_webpage",
             ],
         )

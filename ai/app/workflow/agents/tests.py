@@ -28,9 +28,13 @@ class TestsSpecialistAgent(BaseSpecialistAgent):
             system_prompt=TESTS_SPECIALIST_SYSTEM_PROMPT.strip(),
             tool_names=[
                 "read_file",
+                "search_codebase",
+                "find_references",
                 "get_related_tests",
                 "run_tests",
                 "run_linter",
+                "web_search",
+                "fetch_webpage",
             ],
         )
 

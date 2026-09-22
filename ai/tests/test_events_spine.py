@@ -34,6 +34,38 @@ def test_cost_calculator():
     )
     assert cost_free == 0.0
 
+    # Custom model with optional HM env vars
+    with patch.object(settings, "HIGH_MODEL", "custom-org/custom-security-model"), \
+         patch.object(settings, "HM_INPUT_COST", 20.0), \
+         patch.object(settings, "HM_OUTPUT_COST", 80.0):
+        cost_custom_hm = cost_calculator.calculate_cost_inr(
+            model_name="custom-org/custom-security-model",
+            tokens_in=10_000,
+            tokens_out=2_000,
+        )
+        # (10,000 / 1,000,000)*20.0 + (2,000 / 1,000,000)*80.0 = 0.20 + 0.16 = 0.36
+        assert cost_custom_hm == 0.36
+
+    # Custom model with optional MM env vars
+    with patch.object(settings, "MID_MODEL", "custom-org/custom-coder-model"), \
+         patch.object(settings, "MM_INPUT_COST", 10.0), \
+         patch.object(settings, "MM_OUTPUT_COST", 40.0):
+        cost_custom_mm = cost_calculator.calculate_cost_inr(
+            model_name="custom-org/custom-coder-model",
+            tokens_in=10_000,
+            tokens_out=2_000,
+        )
+        assert cost_custom_mm == 0.18
+
+    # Unmapped / unknown model with no pricing configured returns None (insufficient data)
+    cost_unknown = cost_calculator.calculate_cost_inr(
+        model_name="some-unlisted-provider/unknown-model",
+        tokens_in=10_000,
+        tokens_out=2_000,
+    )
+    assert cost_unknown is None
+
+
 
 def test_events_spine_emit_event_mocked():
     mock_conn = AsyncMock()

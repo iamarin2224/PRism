@@ -120,13 +120,73 @@ def test_build_context_node_multi_source_grounding():
         update = asyncio.run(build_context_node(state))
 
         assert update["status"] == "IN_PROGRESS"
-        # Semantic memory
-        assert len(update["semantic_context"]) == 1
-        assert update["semantic_context"][0]["file_path"] == "src/auth/jwt.ts"
+        # Semantic memory contains both current PR semantics and retrieved repository context
+        semantic_mem = update["semantic_context"]
+        assert isinstance(semantic_mem, dict)
+        assert "pr" in semantic_mem
+        assert "repository" in semantic_mem
+        assert semantic_mem["pr"]["title"] == "Refactor authentication flow"
+        assert semantic_mem["pr"]["pr_number"] == 55
+        assert ".prism/rules.yml" in semantic_mem["pr"]["changed_files"]
+        assert len(semantic_mem["pr"]["changes"]) == 1
+        assert semantic_mem["pr"]["changes"][0]["file_path"] == ".prism/rules.yml"
+        assert len(semantic_mem["repository"]["retrieved_chunks"]) == 1
+        assert semantic_mem["repository"]["retrieved_chunks"][0]["file_path"] == "src/auth/jwt.ts"
+
         # Procedural memory
         assert len(update["procedural_rules"]) > len(BUILTIN_PROCEDURAL_RULES)
         custom_ids = [r["id"] for r in update["procedural_rules"]]
         assert "CUSTOM-1" in custom_ids
+
         # Episodic memory
         assert len(update["episodic_context"]) == 1
         assert update["episodic_context"][0]["title"] == "Missing signature expiration check"
+
+
+def test_build_context_node_semantic_rag_fallback():
+    """Test that when code_retriever fails, PR semantics remain intact in Semantic Memory."""
+    state = create_initial_review_state(
+        review_run_id="run-fallback-test",
+        repo_name="iamarin2224/PRism",
+        pr_number=50,
+        commit_sha="c50",
+        pr_metadata={"title": "Fix memory leak", "body": "Clean up buffer"},
+        diff_summary={"files_content": {"src/buffer.py": "def clean(): pass"}},
+    )
+
+    with patch("app.workflow.nodes.context.code_retriever.retrieve", AsyncMock(side_effect=RuntimeError("Vector DB offline"))), \
+         patch("app.workflow.nodes.context.episodic_memory_service.query_episodic_memory", AsyncMock(return_value=[])):
+
+        update = asyncio.run(build_context_node(state))
+
+        assert update["status"] == "IN_PROGRESS"
+        semantic_mem = update["semantic_context"]
+        assert isinstance(semantic_mem, dict)
+        assert semantic_mem["pr"]["title"] == "Fix memory leak"
+        assert "src/buffer.py" in semantic_mem["pr"]["changed_files"]
+        assert semantic_mem["repository"]["retrieved_chunks"] == []
+
+
+def test_specialist_tool_permissions_configuration():
+    """Verify specialist tool permissions match exact architecture specifications."""
+    from app.workflow.agents import security_agent, quality_agent, tests_agent, docs_agent
+
+    assert set(security_agent.tool_names) == {
+        "read_file", "search_codebase", "find_references", "get_related_tests",
+        "get_git_history", "get_file_history", "get_blame", "web_search", "fetch_webpage"
+    }
+
+    assert set(quality_agent.tool_names) == {
+        "read_file", "search_codebase", "find_references", "get_related_tests",
+        "get_git_history", "get_file_history", "get_blame", "run_linter", "web_search", "fetch_webpage"
+    }
+
+    assert set(tests_agent.tool_names) == {
+        "read_file", "search_codebase", "find_references", "get_related_tests",
+        "run_tests", "run_linter", "web_search", "fetch_webpage"
+    }
+
+    assert set(docs_agent.tool_names) == {
+        "read_file", "web_search", "fetch_webpage"
+    }
+

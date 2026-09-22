@@ -34,7 +34,7 @@ class ReviewState(TypedDict):
     base_sha: str
     pr_metadata: Dict[str, Any]
     diff_summary: Dict[str, Any]
-    semantic_context: List[Dict[str, Any]]
+    semantic_context: Dict[str, Any]
     procedural_rules: List[Dict[str, Any]]
     episodic_context: List[Dict[str, Any]]
     specialist_results: Annotated[List[SpecialistOutput], operator.add]
@@ -67,7 +67,7 @@ def create_initial_review_state(
         "base_sha": base_sha,
         "pr_metadata": pr_metadata or {},
         "diff_summary": diff_summary or {},
-        "semantic_context": [],
+        "semantic_context": {},
         "procedural_rules": [],
         "episodic_context": [],
         "specialist_results": [],

@@ -34,7 +34,13 @@ class QualitySpecialistAgent(BaseSpecialistAgent):
                 "read_file",
                 "search_codebase",
                 "find_references",
+                "get_related_tests",
+                "get_git_history",
+                "get_file_history",
+                "get_blame",
                 "run_linter",
+                "web_search",
+                "fetch_webpage",
             ],
         )
 
