@@ -10,7 +10,7 @@ logger = logging.getLogger("prism.workflow.nodes.actions")
 
 async def post_review_github_node(state: ReviewState) -> Dict[str, Any]:
     """
-    6. Post Review Node:
+    Post Review Node:
     Posts the final structured review comments to GitHub via API.
     """
     start_time = time.perf_counter()
@@ -31,7 +31,7 @@ async def post_review_github_node(state: ReviewState) -> Dict[str, Any]:
 
 async def human_approval_queue_node(state: ReviewState) -> Dict[str, Any]:
     """
-    7. Human Approval Queue Node:
+    Human Approval Queue Node:
     Marks workflow state as awaiting human review in the web dashboard.
     """
     logger.info(f"[{state['review_run_id']}] Workflow paused awaiting human approval.")
@@ -50,7 +50,7 @@ async def human_approval_queue_node(state: ReviewState) -> Dict[str, Any]:
 
 async def resume_after_human_approval_node(state: ReviewState) -> Dict[str, Any]:
     """
-    8. Resume Node:
+    Resume Node:
     Executes after human approval has been granted from dashboard.
     """
     logger.info(f"[{state['review_run_id']}] Workflow resumed from human approval.")

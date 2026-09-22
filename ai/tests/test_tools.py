@@ -1,7 +1,8 @@
 """
-Phase 4 Tool Layer Verification Suite
-Tests all 12 tools across GitHub PR, Repository/Code, History, and Web domains.
+Tool Layer Verification Suite
+Tests all tools across GitHub PR, Repository/Code, History, Web, and Sandbox domains.
 """
+
 
 import asyncio
 import os
@@ -166,7 +167,8 @@ def main():
     test_ssrf_protection()
     test_tool_execution_unit()
     print("\n========================================================")
-    print("🎉 ALL PHASE 4 TOOL LAYER TESTS PASSED SUCCESSFULLY!")
+    print("🎉 ALL TOOL LAYER TESTS PASSED SUCCESSFULLY!")
+
     print("========================================================")
 
 

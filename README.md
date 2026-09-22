@@ -57,21 +57,22 @@ PRism executes an asynchronous, stateful, multi-agent review graph powered by **
 GitHub Webhook ──► [FastAPI 202 Ingress + Redis Lock] ──► [ARQ Background Worker]
                                                                │
                                                                ▼
-                                                  [1. Build Context Node]
-                                                  • Semantic Memory (RAG)
-                                                  • Procedural Memory (.prism/rules)
-                                                  • Episodic Memory (Past Feedback)
-                                                               │
-                             ┌─────────────────────────────────┼─────────────────────────────────┐
-                             │                                 │                                 │
-                             ▼                                 ▼                                 ▼
-                     [Security Agent]                  [Quality Agent]                    [Tests Agent]             [Docs Agent]
-                  DeepSeek V4.1 Flash              Qwen3 Coder 30B                   Qwen3 Coder 30B          OpenRouter Free
-                  (OWASP, Auth, Secrets)          (Design, Performance)             (Coverage, Sandbox)       (Docs, Contracts)
-                             │                                 │                                 │                  │
-                             └─────────────────────────────────┼─────────────────────────────────┴──────────────────┘
-                                                               │ (Fan-In Join)
-                                                               ▼
+                                                   [1. Build Context Node]
+                                                   • Semantic Memory (RAG + PR Diff)
+                                                   • Procedural Memory (.prism/rules)
+                                                   • Episodic Memory (Past Feedback)
+                                                                │
+         ┌──────────────────────────────┬───────────────────────┼──────────────────────────────┐
+         │                              │                       │                              │
+         ▼                              ▼                       ▼                              ▼
+ [Security Agent]               [Quality Agent]           [Tests Agent]                  [Docs Agent]
+DeepSeek V4.1 Flash             Qwen3 Coder 30B          Qwen3 Coder 30B               OpenRouter Free
+(OWASP, Auth, Secrets)       (Design, Performance)     (Coverage, Sandbox)            (Docs, Contracts)
+         │                              │                       │                              │
+         └──────────────────────────────┴───────────────────────┼──────────────────────────────┘
+                                                                │ (Fan-In Join)
+                                                                ▼
+
                                                 [2. Deterministic Merge Node]
                                                 • Line overlap & path deduplication
                                                 • Cross-specialist agreement scoring

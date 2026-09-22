@@ -10,7 +10,7 @@ logger = logging.getLogger("prism.workflow.nodes.gate")
 
 async def critic_verifier_node(state: ReviewState) -> Dict[str, Any]:
     """
-    4. Critic / Verifier Node:
+    Critic / Verifier Node:
     Validates candidate findings against retrieved code context to eliminate
     hallucinations and false positives.
     """
@@ -38,7 +38,7 @@ def confidence_severity_gate_router(
     state: ReviewState,
 ) -> Literal["post_review_github", "human_approval_queue"]:
     """
-    5. Confidence & Severity Gate Router:
+    Confidence & Severity Gate Router:
     Evaluates verified findings and decides whether to post directly or pause for HITL review.
     - If any finding is CRITICAL or confidence < 0.85 -> "human_approval_queue"
     - Otherwise -> "post_review_github"

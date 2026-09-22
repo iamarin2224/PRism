@@ -101,7 +101,7 @@ async def init_db() -> None:
             CREATE INDEX IF NOT EXISTS repositories_full_name_idx ON repositories (full_name);
         """)
 
-        # Create episodic_memory table for Phase 5 historical human feedback
+        # Create episodic_memory table for historical human feedback
         await conn.execute(f"""
             CREATE TABLE IF NOT EXISTS episodic_memory (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

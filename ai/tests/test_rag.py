@@ -1,7 +1,8 @@
 """
-Phase 3 Code-Aware RAG Verification Script
+Code-Aware RAG Verification Suite
 Tests chunking, filtering, vector store contracts, and ingestion pipelines.
 """
+
 
 import sys
 import os
@@ -154,9 +155,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 if __name__ == "__main__":
     print("=========================================")
-    print("PRism Phase 3 RAG Pipeline Unit Tests")
+    print("PRism RAG Pipeline Unit Tests")
     print("=========================================")
     test_filtering()
     test_language_aware_chunking()
     print("=========================================")
-    print("All Phase 3 RAG unit tests completed successfully!")
+    print("All RAG unit tests completed successfully!")
+

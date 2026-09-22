@@ -15,7 +15,7 @@ logger = logging.getLogger("prism.workflow.nodes.context")
 
 async def build_context_node(state: ReviewState) -> Dict[str, Any]:
     """
-    1. Context Construction Node:
+    Context Construction Node:
     Aggregates Semantic Memory (Current PR Semantics + Code-aware RAG repository context),
     Procedural Memory (.prism/rules & engineering standards), and Episodic Memory
     (historical human feedback) before parallel specialist fan-out.

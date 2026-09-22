@@ -15,7 +15,7 @@ logger = logging.getLogger("prism.workflow.nodes.specialists")
 
 async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.1 Security Specialist Agent Node:
+    Security Specialist Agent Node:
     Analyzes OWASP vulnerabilities, auth flaws, secrets, and injection risks.
     """
     logger.info(f"[{state['review_run_id']}] Security specialist executing...")
@@ -43,7 +43,7 @@ async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
 
 async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.2 Quality Specialist Agent Node:
+    Quality Specialist Agent Node:
     Analyzes code design, anti-patterns, performance, and maintainability.
     """
     logger.info(f"[{state['review_run_id']}] Quality specialist executing...")
@@ -71,7 +71,7 @@ async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
 
 async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.3 Tests Specialist Agent Node:
+    Tests Specialist Agent Node:
     Analyzes regression risk, test coverage, and sandbox verification.
     """
     logger.info(f"[{state['review_run_id']}] Tests specialist executing...")
@@ -99,7 +99,7 @@ async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
 
 async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
     """
-    2.4 Documentation Specialist Agent Node:
+    Documentation Specialist Agent Node:
     Analyzes API contracts, comments, breaking changes, and documentation completeness.
     """
     logger.info(f"[{state['review_run_id']}] Docs specialist executing...")

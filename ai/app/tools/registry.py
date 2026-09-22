@@ -51,7 +51,7 @@ class ToolRegistry:
     """
     Central registry for PRism tools.
     Provides tool lookup, discovery, and export of OpenAI-compatible schemas
-    for downstream consumption by LangGraph/LLM tool binding in Phase 5.
+    for downstream consumption by LangGraph/LLM tool binding.
     """
 
     @classmethod

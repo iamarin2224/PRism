@@ -64,11 +64,11 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    """Health check root endpoint (Phase 0)."""
+    """Health check root endpoint."""
     return {"message": "PRism AI service is running"}
 
 # ============================================================
-# Phase 1: LLM & Structured Output Testing Endpoints
+# LLM & Structured Output Testing Endpoints
 # ============================================================
 
 @app.post("/api/ai/test", response_model=LLMResponse)
@@ -127,7 +127,7 @@ def test_structured_output(request: StructuredTestRequest = StructuredTestReques
         )
 
 # ============================================================
-# Phase 2: GitHub Webhook Forwarding Endpoint
+# GitHub Webhook Forwarding Endpoint
 # ============================================================
 
 @app.post("/api/github/pr-event")
@@ -137,7 +137,7 @@ async def receive_github_pr_event(
     x_github_delivery: Optional[str] = Header(None, alias="X-GitHub-Delivery"),
 ):
     """
-    Asynchronous GitHub Webhook Ingress (Phase 5.1):
+    Asynchronous GitHub Webhook Ingress:
     - Validates PREventPayload schema.
     - Atomically enforces idempotency on X-GitHub-Delivery via Redis.
     - Fast-dispatches background review task to Redis + ARQ queue.
@@ -174,8 +174,9 @@ async def receive_github_pr_event(
     }
 
 # ============================================================
-# Phase 3: Code-Aware RAG Endpoints
+# Code-Aware RAG Endpoints
 # ============================================================
+
 
 class IndexWithFilesRequest(BaseModel):
     request: IndexingRequest
@@ -197,7 +198,7 @@ class RetrieveRequest(BaseModel):
 @app.post("/api/rag/index", response_model=IndexingResponse)
 async def trigger_indexing(payload: IndexingRequest):
     """
-    3E — Manual Background Indexing
+    Manual Background Indexing:
     Explicitly triggers repository indexing in background. Non-blocking HTTP response.
     """
     try:
@@ -254,7 +255,7 @@ async def get_index_status(repo_name: str = Query(..., description="Repository f
 @app.post("/api/rag/push-event", response_model=RepoIndexState)
 async def handle_push_event(payload: PushEventPayload):
     """
-    3E — GitHub Push Webhook Handler
+    GitHub Push Webhook Handler:
     Marks repository index STALE if new commit differs from indexed commit.
     Does NOT automatically perform heavy indexing.
     """
@@ -273,7 +274,7 @@ async def handle_push_event(payload: PushEventPayload):
 @app.post("/api/rag/retrieve", response_model=RetrievalResult)
 async def retrieve_code_context(payload: RetrieveRequest):
     """
-    3D — Vector Store Retrieval
+    Vector Store Retrieval:
     Retrieves top-K relevant chunks strictly scoped to the repository (WHERE repo_name = :repo_name).
     """
     try:
@@ -293,7 +294,7 @@ async def retrieve_code_context(payload: RetrieveRequest):
 @app.post("/api/rag/query", response_model=QAResponse)
 async def ask_repository_question(payload: QARequest):
     """
-    3F — Repository Q&A
+    Repository Q&A:
     Reuses the RAG retrieval pipeline and OpenRouter LLM to answer questions with source citations.
     """
     try:
@@ -303,3 +304,4 @@ async def ask_repository_question(payload: QARequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Repository Q&A failed: {str(e)}",
         )
+

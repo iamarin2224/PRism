@@ -11,7 +11,7 @@ logger = logging.getLogger("prism.workflow.nodes.merge")
 
 async def aggregate_and_deduplicate_node(state: ReviewState) -> Dict[str, Any]:
     """
-    3. Aggregation & Deduplication Node:
+    Aggregation & Deduplication Node:
     Pure-Python deterministic merge matching findings by file path and overlapping
     line ranges, tracking cross-specialist agreement.
     """
