@@ -8,17 +8,26 @@ from app.workflow.resilience import CircuitBreaker, CircuitBreakerOpenException,
 
 
 def test_cost_calculator():
-    # DeepSeek High Model
-    cost_ds = cost_calculator.calculate_cost_usd(
+    # DeepSeek High Model (₹15.10 / 1M in, ₹60.40 / 1M out)
+    cost_ds = cost_calculator.calculate_cost_inr(
         model_name="deepseek/deepseek-v4.1-flash",
         tokens_in=10_000,
         tokens_out=2_000,
     )
-    # (10k / 1M)*0.14 + (2k / 1M)*0.28 = 0.0014 + 0.00056 = 0.00196
-    assert cost_ds == 0.00196
+    # (10,000 / 1,000,000)*15.10 + (2,000 / 1,000,000)*60.40 = 0.151 + 0.1208 = 0.2718
+    assert cost_ds == 0.2718
+
+    # Qwen Mid Model (₹7.05 / 1M in, ₹27.18 / 1M out)
+    cost_qwen = cost_calculator.calculate_cost_inr(
+        model_name="qwen/qwen3-coder-30b-a3b-instruct",
+        tokens_in=10_000,
+        tokens_out=2_000,
+    )
+    # (10,000 / 1,000,000)*7.05 + (2,000 / 1,000,000)*27.18 = 0.0705 + 0.05436 = 0.12486
+    assert cost_qwen == 0.12486
 
     # OpenRouter free model
-    cost_free = cost_calculator.calculate_cost_usd(
+    cost_free = cost_calculator.calculate_cost_inr(
         model_name="openrouter/free",
         tokens_in=50_000,
         tokens_out=10_000,
@@ -44,7 +53,7 @@ def test_events_spine_emit_event_mocked():
                 payload={"findings": 2},
                 tokens_in=500,
                 tokens_out=100,
-                cost_usd=0.0005,
+                cost_inr=0.0005,
                 duration_ms=45.2,
             )
         )

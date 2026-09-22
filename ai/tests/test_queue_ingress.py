@@ -101,10 +101,24 @@ def test_webhook_endpoint_fast_202_and_idempotency():
 def test_arq_worker_process_review_job():
     payload = {
         "repository": {"full_name": "iamarin2224/PRism"},
-        "pull_request": {"number": 42},
+        "pull_request": {"number": 42, "head_sha": "abc123", "base_sha": "main"},
     }
-    receipt = asyncio.run(process_review_job(ctx={}, payload=payload, delivery_id="deliv-worker-01"))
+    mock_engine = AsyncMock()
+    mock_engine.run = AsyncMock(
+        return_value={
+            "status": "COMPLETED",
+            "routing_decision": "POST_GITHUB",
+            "verified_findings": [],
+        }
+    )
+
+    receipt = asyncio.run(
+        process_review_job(ctx={"workflow_engine": mock_engine}, payload=payload, delivery_id="deliv-worker-01")
+    )
     assert receipt["status"] == "processed"
+    assert receipt["workflow_status"] == "COMPLETED"
+    assert receipt["routing_decision"] == "POST_GITHUB"
     assert receipt["repo"] == "iamarin2224/PRism"
     assert receipt["pr_number"] == 42
     assert receipt["delivery_id"] == "deliv-worker-01"
+    assert mock_engine.run.called

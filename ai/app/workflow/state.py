@@ -44,7 +44,7 @@ class ReviewState(TypedDict):
     status: str                      # "QUEUED", "IN_PROGRESS", "COMPLETED", "FAILED", "AWAITING_HUMAN_APPROVAL"
     total_tokens_in: int
     total_tokens_out: int
-    total_cost_usd: float
+    total_cost_inr: float
     review_summary_markdown: Optional[str]
     errors: Annotated[List[str], operator.add]
 
@@ -77,7 +77,7 @@ def create_initial_review_state(
         "status": "QUEUED",
         "total_tokens_in": 0,
         "total_tokens_out": 0,
-        "total_cost_usd": 0.0,
+        "total_cost_inr": 0.0,
         "review_summary_markdown": None,
         "errors": [],
     }

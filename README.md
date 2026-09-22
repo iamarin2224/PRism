@@ -7,43 +7,97 @@ PRism is an intelligent, multi-stage agentic code review platform designed to an
 ## Architecture Overview
 
 ```text
-                               GitHub
-                                 │
-                                 │ Webhooks (HMAC-SHA256 Signed)
-                                 ▼
-                     ┌───────────────────────┐
-                     │   Next.js Platform    │ (Port 5050)
-                     │                       │
-                     │  • Web Dashboard (UI) │
-                     │  • GitHub Webhook Hub │
-                     │  • API Gateway        │
-                     │  • Prisma DB Client   │
-                     └───────────┬───────────┘
-                                 │
-                                 │ Async HTTP Proxy / Event Dispatch
-                                 ▼
-                     ┌───────────────────────┐
-                     │   FastAPI AI Engine   │ (Port 8000)
-                     │                       │
-                     │  • Code-Aware RAG     │
-                     │  • AST-Based Chunking │
-                     │  • 14 Agent Tools     │
-                     │  • E2B Cloud Sandbox  │
-                     │  • LLM Structured Out │
-                     └───────────┬───────────┘
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌───────────────────┐   ┌───────────────────┐
-│ OpenRouter LLMs │    │  Neon PostgreSQL  │   │  E2B Cloud        │
-│ (Reasoning)     │    │  (pgvector + HNSW)│   │  Polyglot Sandbox │
-└─────────────────┘    └───────────────────┘   └───────────────────┘
+                                GitHub
+                                  │
+                                  │ Webhooks (HMAC-SHA256 Signed)
+                                  ▼
+                      ┌───────────────────────┐
+                      │   Next.js Platform    │ (Port 5050)
+                      │                       │
+                      │  • Web Dashboard (UI) │
+                      │  • GitHub Webhook Hub │
+                      │  • API Gateway        │
+                      │  • Prisma DB Client   │
+                      └───────────┬───────────┘
+                                  │
+                                  │ Async HTTP Ingress / Webhook Proxy
+                                  ▼
+                      ┌───────────────────────┐
+                      │   FastAPI AI Engine   │ (Port 8000)
+                      │                       │
+                      │  • Redis Idempotency  │
+                      │  • ARQ Job Queue      │
+                      │  • LangGraph Engine   │
+                      │  • 4 Specialist Agents│
+                      │  • Critic Verification│
+                      │  • Append-Only Spine  │
+                      └───────────┬───────────┘
+                                  │
+          ┌───────────────────────┼───────────────────────┐
+          ▼                       ▼                       ▼
+┌──────────────────┐    ┌───────────────────┐   ┌───────────────────┐
+│ Tiered LLM Pool  │    │  Neon PostgreSQL  │   │  E2B Cloud        │
+│ (DeepSeek/Qwen/  │    │  (pgvector + HNSW │   │  Polyglot Sandbox │
+│  OpenRouter)     │    │   + Audit Spine)  │   │  (Isolated Exec)  │
+└──────────────────┘    └───────────────────┘   └───────────────────┘
 ```
 
-- **Next.js (`http://localhost:5050`)**: Web dashboard and webhook dispatcher. Handles HMAC-SHA256 signature verification, GitHub App event parsing (`pull_request`, `push`), and local test benches.
-- **FastAPI AI Engine (`http://localhost:8000`)**: Python engine handling prompt synthesis, language-aware AST code chunking, vector embeddings, pgvector retrieval, agent tool execution, sandboxed code execution, and LLM structured outputs.
-- **Neon PostgreSQL**: Serverless database storing repository indexing states and 1536-dimensional code vector embeddings with HNSW cosine indexes.
+- **Next.js (`http://localhost:5050`)**: Web dashboard and webhook dispatcher. Handles HMAC-SHA256 signature verification, GitHub App event parsing (`pull_request`, `push`), and interactive Human-in-the-Loop review management.
+- **FastAPI AI Engine (`http://localhost:8000`)**: Python orchestration engine hosting the LangGraph state machine, Redis + ARQ background review workers, AST chunking, pgvector RAG, 14 tool definitions, multi-language E2B sandboxes, and tiered LLM routing.
+- **Neon PostgreSQL**: Serverless database storing repository indexing states, 1536-dimensional code vector embeddings with HNSW cosine indexes, audit events, review runs, and episodic developer feedback.
 - **E2B Cloud Sandbox**: Secure, isolated cloud containers used by AI agents to dynamically execute tests, linters, and type-checkers without host security risks.
+
+---
+
+## Multi-Agent Review Orchestration Pipeline
+
+PRism executes an asynchronous, stateful, multi-agent review graph powered by **LangGraph** and **Redis + ARQ**:
+
+```text
+GitHub Webhook ──► [FastAPI 202 Ingress + Redis Lock] ──► [ARQ Background Worker]
+                                                               │
+                                                               ▼
+                                                  [1. Build Context Node]
+                                                  • Semantic Memory (RAG)
+                                                  • Procedural Memory (.prism/rules)
+                                                  • Episodic Memory (Past Feedback)
+                                                               │
+                             ┌─────────────────────────────────┼─────────────────────────────────┐
+                             │                                 │                                 │
+                             ▼                                 ▼                                 ▼
+                     [Security Agent]                  [Quality Agent]                    [Tests Agent]             [Docs Agent]
+                  DeepSeek V4.1 Flash              Qwen3 Coder 30B                   Qwen3 Coder 30B          OpenRouter Free
+                  (OWASP, Auth, Secrets)          (Design, Performance)             (Coverage, Sandbox)       (Docs, Contracts)
+                             │                                 │                                 │                  │
+                             └─────────────────────────────────┼─────────────────────────────────┴──────────────────┘
+                                                               │ (Fan-In Join)
+                                                               ▼
+                                                [2. Deterministic Merge Node]
+                                                • Line overlap & path deduplication
+                                                • Cross-specialist agreement scoring
+                                                               │
+                                                               ▼
+                                                [3. Critic / Verifier Node]
+                                                • Anti-hallucination verification
+                                                • Code snippet grounding check
+                                                               │
+                                                               ▼
+                                                [4. Decision Gate]
+                                               /                  \
+                    (High Conf & No Critical) /                    \ (Low Conf OR Critical Finding)
+                                             ▼                      ▼
+                                     [Post to GitHub]     [Human Approval Queue]
+                                                                    │
+                                                                    ▼
+                                                          [Developer Dashboard]
+```
+
+1. **Non-Blocking Ingress & Idempotency:** Validates GitHub webhooks via HMAC-SHA256, uses Redis atomic `SETNX` for `X-GitHub-Delivery` deduplication, and queues jobs to ARQ with immediate `202 Accepted` response (<50ms).
+2. **Tri-Partite Context Grounding:** Before agents run, the context builder aggregates **Semantic Memory** (Code-Aware RAG retrieval), **Procedural Memory** (`.prism/rules.yml` & built-in standards), and **Episodic Memory** (historical accepted/dismissed review findings).
+3. **Parallel Specialist Fan-Out:** Four domain-specialized agents investigate concurrently using tiered models with automatic fallback mechanisms and dynamic tool calling (14 tools + E2B sandbox).
+4. **Deterministic Merge & Critic Verification:** Findings are deduplicated based on file path and line overlap with agreement scoring, then audited by a Critic agent against retrieved code snippets to eliminate hallucinations.
+5. **Confidence & Severity Decision Gate:** High-confidence reviews post comments directly to GitHub, while critical or low-confidence findings route to a Human-in-the-Loop approval queue.
+6. **Append-Only Telemetry & Cost Accounting:** Every step emits immutable structured events into PostgreSQL (`audit_events`) tracking token consumption, latencies, and INR (₹) costs.
 
 ---
 

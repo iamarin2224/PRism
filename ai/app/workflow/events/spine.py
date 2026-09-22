@@ -25,7 +25,8 @@ class EventsSpine:
         span_id: Optional[str] = None,
         tokens_in: int = 0,
         tokens_out: int = 0,
-        cost_usd: float = 0.0,
+        cost_inr: float = 0.0,
+        cost_usd: Optional[float] = None,
         duration_ms: Optional[float] = None,
     ) -> Optional[str]:
         """
@@ -38,6 +39,7 @@ class EventsSpine:
         event_id = str(uuid.uuid4())
         span_id = span_id or str(uuid.uuid4())
         json_payload = json.dumps(payload or {})
+        effective_cost = cost_usd if cost_usd is not None else cost_inr
 
         try:
             pool = await get_db_pool()
@@ -59,7 +61,7 @@ class EventsSpine:
                     json_payload,
                     tokens_in,
                     tokens_out,
-                    cost_usd,
+                    effective_cost,
                     duration_ms,
                 )
             logger.debug(f"Emitted audit event '{event_type}' for node '{node_name}' in run '{review_run_id}'")

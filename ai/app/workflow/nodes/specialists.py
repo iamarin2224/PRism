@@ -20,7 +20,7 @@ async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
     logger.info(f"[{state['review_run_id']}] Security specialist executing...")
     output = await security_agent.execute(state)
 
-    cost_usd = cost_calculator.calculate_cost_usd(
+    cost_inr = cost_calculator.calculate_cost_inr(
         model_name="deepseek/deepseek-v4.1-flash",
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
@@ -33,7 +33,7 @@ async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
         payload={"findings_count": len(output.findings), "error": output.error},
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
-        cost_usd=cost_usd,
+        cost_inr=cost_inr,
         duration_ms=output.execution_time_ms,
     )
 
@@ -48,7 +48,7 @@ async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
     logger.info(f"[{state['review_run_id']}] Quality specialist executing...")
     output = await quality_agent.execute(state)
 
-    cost_usd = cost_calculator.calculate_cost_usd(
+    cost_inr = cost_calculator.calculate_cost_inr(
         model_name="qwen/qwen3-coder-30b-a3b-instruct",
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
@@ -61,7 +61,7 @@ async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
         payload={"findings_count": len(output.findings), "error": output.error},
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
-        cost_usd=cost_usd,
+        cost_inr=cost_inr,
         duration_ms=output.execution_time_ms,
     )
 
@@ -76,7 +76,7 @@ async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
     logger.info(f"[{state['review_run_id']}] Tests specialist executing...")
     output = await tests_agent.execute(state)
 
-    cost_usd = cost_calculator.calculate_cost_usd(
+    cost_inr = cost_calculator.calculate_cost_inr(
         model_name="qwen/qwen3-coder-30b-a3b-instruct",
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
@@ -89,7 +89,7 @@ async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
         payload={"findings_count": len(output.findings), "error": output.error},
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
-        cost_usd=cost_usd,
+        cost_inr=cost_inr,
         duration_ms=output.execution_time_ms,
     )
 
@@ -104,7 +104,7 @@ async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
     logger.info(f"[{state['review_run_id']}] Docs specialist executing...")
     output = await docs_agent.execute(state)
 
-    cost_usd = cost_calculator.calculate_cost_usd(
+    cost_inr = cost_calculator.calculate_cost_inr(
         model_name="openrouter/free",
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
@@ -117,7 +117,7 @@ async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
         payload={"findings_count": len(output.findings), "error": output.error},
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
-        cost_usd=cost_usd,
+        cost_inr=cost_inr,
         duration_ms=output.execution_time_ms,
     )
 
