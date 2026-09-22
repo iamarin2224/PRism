@@ -18,23 +18,100 @@ enum IndexStatus {
   FAILED
 }
 
+model User {
+  id             String         @id @default(uuid())
+  githubId       String         @unique @map("github_id")
+  githubUsername String         @map("github_username")
+  email          String?
+  avatarUrl      String?        @map("avatar_url")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  installations  Installation[]
+  accounts       Account[]
+  sessions       Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  refreshToken      String?  @map("refresh_token")
+  accessToken       String?  @map("access_token")
+  expiresAt         Int?     @map("expires_at")
+  tokenType         String?  @map("token_type")
+  scope             String?
+  idToken           String?  @map("id_token")
+  sessionState      String?  @map("session_state")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Installation {
+  id             String       @id @default(uuid())
+  installationId BigInt       @unique @map("installation_id")
+  accountLogin   String       @map("account_login")
+  accountType    String       @default("User") @map("account_type")
+  accountAvatar  String?      @map("account_avatar")
+  userId         String       @map("user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repositories   Repository[]
+
+  @@index([userId], name: "installations_user_idx")
+  @@map("installations")
+}
+
 model Repository {
-  id             String      @id @default(uuid())
-  fullName       String      @unique @map("full_name")
+  id             String        @id @default(uuid())
+  fullName       String        @unique @map("full_name")
   owner          String
   name           String
-  defaultBranch  String      @default("main") @map("default_branch")
-  installationId BigInt?     @map("installation_id")
-  indexedCommit  String?     @map("indexed_commit")
-  currentCommit  String?     @map("current_commit")
-  indexStatus    IndexStatus @default(NOT_INDEXED) @map("index_status")
-  errorMessage   String?     @map("error_message")
-  lastIndexedAt  DateTime?   @map("last_indexed_at")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  defaultBranch  String        @default("main") @map("default_branch")
+  installationId BigInt?       @map("installation_id")
+  githubRepoId   BigInt?       @map("github_repo_id")
+  isPrivate      Boolean       @default(false) @map("is_private")
+  isTracked      Boolean       @default(false) @map("is_tracked")
+  indexedCommit  String?       @map("indexed_commit")
+  currentCommit  String?       @map("current_commit")
+  indexStatus    IndexStatus   @default(NOT_INDEXED) @map("index_status")
+  errorMessage   String?       @map("error_message")
+  lastIndexedAt  DateTime?     @map("last_indexed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
+  installation   Installation? @relation(fields: [installationId], references: [installationId], onDelete: SetNull)
+  reviewRuns     ReviewRun[]
+
+  @@index([installationId], name: "repositories_installation_idx")
+  @@index([isTracked], name: "repositories_tracked_idx")
   @@map("repositories")
 }
+
 
 model CodeChunk {
   id         String   @id @default(uuid())
@@ -107,6 +184,7 @@ enum FeedbackType {
 
 model ReviewRun {
   id              String           @id @default(uuid())
+  repositoryId    String?          @map("repository_id")
   repoName        String           @map("repo_name")
   prNumber        Int              @map("pr_number")
   commitSha       String           @map("commit_sha")
@@ -122,13 +200,16 @@ model ReviewRun {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
+  repository      Repository?      @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   findings        ReviewFinding[]
   auditEvents     AuditEvent[]
 
+  @@index([repositoryId], name: "review_runs_repository_idx")
   @@index([repoName, prNumber], name: "review_runs_repo_pr_idx")
   @@index([status], name: "review_runs_status_idx")
   @@map("review_runs")
 }
+
 
 model ReviewFinding {
   id            String          @id @default(uuid())

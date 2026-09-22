@@ -167,19 +167,13 @@ class IndexingPipeline:
         self,
         request: IndexingRequest,
         raw_files: Optional[List[dict]] = None,
+        changed_files_map: Optional[Dict[str, List[str]]] = None,
     ) -> IndexingResponse:
         """
-        Schedules a background indexing job. Prevents duplicate concurrent indexing
-        runs on the same repository.
+        Schedules an asynchronous background indexing job via Redis + ARQ.
+        Prevents duplicate concurrent indexing runs on the same repository.
         """
         repo_name = request.repo_name
-
-        if repo_name in _active_indexing_jobs:
-            return IndexingResponse(
-                repo_name=repo_name,
-                status=IndexStatus.INDEXING,
-                message="An indexing job is already in progress for this repository.",
-            )
 
         # Initialize repository record if needed
         state = await self.get_or_create_repo_record(repo_name, request.installation_id)
@@ -188,27 +182,25 @@ class IndexingPipeline:
         # Resolve token: prioritize request token, fallback to environment GITHUB_TOKEN
         token = request.github_token or settings.GITHUB_TOKEN or None
 
-        # Mark in-memory lock and launch background task
-        _active_indexing_jobs.add(repo_name)
-        asyncio.create_task(
-            self._execute_indexing_job(
-                repo_name=repo_name,
-                target_commit=target_commit,
-                force_full=request.force_full,
-                github_token=token,
-                raw_files=raw_files,
-            )
+        from app.queue.enqueue import enqueue_indexing_job
+        job_id = await enqueue_indexing_job(
+            repo_name=repo_name,
+            commit_sha=target_commit,
+            force_full=request.force_full,
+            github_token=token,
+            raw_files=raw_files,
+            changed_files_map=changed_files_map,
+            installation_id=request.installation_id,
         )
-
 
         return IndexingResponse(
             repo_name=repo_name,
             status=IndexStatus.INDEXING,
-            message="Repository indexing scheduled successfully in background.",
+            message=f"Repository indexing scheduled in ARQ background queue (job_id: {job_id}).",
             commit_sha=target_commit,
         )
 
-    async def _execute_indexing_job(
+    async def execute_indexing(
         self,
         repo_name: str,
         target_commit: str,
@@ -216,13 +208,14 @@ class IndexingPipeline:
         github_token: Optional[str] = None,
         raw_files: Optional[List[dict]] = None,
         changed_files_map: Optional[Dict[str, List[str]]] = None,
+        installation_id: Optional[int] = None,
     ) -> None:
-        """Background execution worker for repository indexing."""
+        """Execution worker for repository full and incremental indexing."""
         try:
             logger.info(f"Starting indexing for {repo_name} at commit {target_commit} (force_full={force_full})")
             await self.update_repo_status(repo_name, IndexStatus.INDEXING)
 
-            state = await self.get_or_create_repo_record(repo_name)
+            state = await self.get_or_create_repo_record(repo_name, installation_id)
             is_incremental = (
                 not force_full
                 and state.indexed_commit is not None
@@ -250,8 +243,6 @@ class IndexingPipeline:
                 status=IndexStatus.FAILED,
                 error_message=str(e),
             )
-        finally:
-            _active_indexing_jobs.discard(repo_name)
 
     async def _run_full_indexing(
         self,

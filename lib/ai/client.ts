@@ -83,19 +83,26 @@ export async function forwardPREvent(eventData: PREventPayload): Promise<any> {
 }
 
 /**
- * Forwards GitHub push event data to the FastAPI AI service to mark RAG index STALE.
+ * Forwards GitHub push event data to the FastAPI AI service to trigger incremental indexing.
  */
-export async function forwardPushEvent(repoName: string, headCommit?: string, ref?: string): Promise<any> {
+export async function forwardPushEvent(
+  repoName: string,
+  headCommit?: string,
+  ref?: string,
+  changedFilesMap?: { added: string[]; modified: string[]; deleted: string[] }
+): Promise<any> {
   const response = await fetch(`${AI_SERVICE_URL}/api/rag/push-event`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       repo_name: repoName,
-      head_commit: headCommit || null,
+      new_head_sha: headCommit || 'HEAD',
       ref: ref || null,
+      changed_files_map: changedFilesMap || null,
     }),
     cache: 'no-store',
   });
+
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

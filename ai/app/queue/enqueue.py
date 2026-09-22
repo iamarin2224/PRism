@@ -67,5 +67,70 @@ async def enqueue_review_job(
         logger.info(f"Enqueued review job '{job_id}' for delivery '{clean_delivery_id}'")
         return job_id
     except Exception as e:
-        logger.warning(f"Failed to enqueue job to ARQ pool ({e}). Returning local job id '{job_id}'.")
+        logger.warning(f"Failed to enqueue to ARQ pool ({e}). Returning local job id '{job_id}'.")
         return job_id
+
+
+INDEXING_LOCK_PREFIX = "indexing:lock:"
+DEFAULT_INDEXING_LOCK_TTL = 600  # 10 minutes
+
+
+async def check_and_acquire_indexing_lock(repo_name: str, ttl_seconds: int = DEFAULT_INDEXING_LOCK_TTL) -> bool:
+    """Atomically acquires a Redis lock for repository indexing to prevent duplicate runs."""
+    key = f"{INDEXING_LOCK_PREFIX}{repo_name}"
+    try:
+        redis_client = await get_redis_client()
+        is_acquired = await redis_client.set(key, "1", nx=True, ex=ttl_seconds)
+        return bool(is_acquired)
+    except Exception as e:
+        logger.warning(f"Redis indexing lock check failed: {e}. Allowing job to proceed.")
+        return True
+
+
+async def release_indexing_lock(repo_name: str) -> None:
+    """Releases the repository indexing Redis lock."""
+    key = f"{INDEXING_LOCK_PREFIX}{repo_name}"
+    try:
+        redis_client = await get_redis_client()
+        await redis_client.delete(key)
+    except Exception as e:
+        logger.warning(f"Failed to release Redis indexing lock for {repo_name}: {e}")
+
+
+async def enqueue_indexing_job(
+    repo_name: str,
+    commit_sha: Optional[str] = None,
+    force_full: bool = False,
+    github_token: Optional[str] = None,
+    raw_files: Optional[list] = None,
+    changed_files_map: Optional[dict] = None,
+    installation_id: Optional[int] = None,
+) -> str:
+    """
+    Dispatch an asynchronous repository indexing job to the ARQ Redis background queue.
+    """
+    job_id = f"index-{uuid.uuid4()}"
+    payload = {
+        "repo_name": repo_name,
+        "commit_sha": commit_sha or "main",
+        "force_full": force_full,
+        "github_token": github_token,
+        "raw_files": raw_files,
+        "changed_files_map": changed_files_map,
+        "installation_id": installation_id,
+    }
+
+    try:
+        redis_settings = RedisSettings.from_dsn(settings.REDIS_URL or "redis://localhost:6379")
+        arq_pool: ArqRedis = await create_pool(redis_settings)
+        await arq_pool.enqueue_job(
+            "process_indexing_job",
+            payload,
+            _job_id=job_id,
+        )
+        logger.info(f"Enqueued indexing job '{job_id}' for repo '{repo_name}' at commit '{commit_sha or 'main'}'")
+        return job_id
+    except Exception as e:
+        logger.warning(f"Failed to enqueue indexing job to ARQ pool ({e}). Returning local job id '{job_id}'.")
+        return job_id
+

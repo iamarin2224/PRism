@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import {
   verifyGitHubSignature,
   extractPREventData,
@@ -81,10 +82,28 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 4.1 Verify repository tracking status
+    const repository = await prisma.repository.findUnique({
+
+      where: { fullName: repoFullName },
+    });
+
+    if (!repository || !repository.isTracked) {
+      console.log(
+        `[GitHub Webhook] Ignored PR action '${action}' for untracked repository '${repoFullName || 'unknown'}' #${prNumber || 'unknown'}`
+      );
+      return NextResponse.json({
+        status: 'ignored',
+        reason: 'Repository is not tracked in PRism',
+        repo: repoFullName,
+        prNumber,
+      });
+    }
+
     // Extract normalized representation
     const prEventData = extractPREventData(deliveryId, payload);
     console.log(
-      `[GitHub Webhook] Recognized PR #${prEventData.pullRequest.number} (${prEventData.action}) from ${prEventData.repository.fullName} [${prEventData.pullRequest.sourceBranch} -> ${prEventData.pullRequest.targetBranch}]`
+      `[GitHub Webhook] Recognized PR #${prEventData.pullRequest.number} (${prEventData.action}) from tracked repo ${prEventData.repository.fullName} [${prEventData.pullRequest.sourceBranch} -> ${prEventData.pullRequest.targetBranch}]`
     );
 
     // Forward to FastAPI AI service
@@ -109,7 +128,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 6. Handle "push" events (lightweight mark STALE for RAG indexing)
+  // 6. Handle "push" events (automatic incremental indexing for tracked repos)
   if (event === 'push') {
     const repoFullName = payload.repository?.full_name;
     const afterCommit = payload.after;
@@ -119,27 +138,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing repository in push payload' }, { status: 400 });
     }
 
+    // Verify repository tracking
+    const repository = await prisma.repository.findUnique({
+      where: { fullName: repoFullName },
+    });
+
+    if (!repository || !repository.isTracked) {
+      console.log(`[GitHub Webhook] Ignored push event for untracked repository '${repoFullName}'`);
+      return NextResponse.json({
+        status: 'ignored',
+        reason: 'Repository is not tracked in PRism',
+        repo: repoFullName,
+      });
+    }
+
     console.log(
-      `[GitHub Webhook] Received push event for ${repoFullName} (ref: ${ref || 'unknown'}, after: ${afterCommit || 'unknown'})`
+      `[GitHub Webhook] Received push event for tracked repo ${repoFullName} (ref: ${ref || 'unknown'}, after: ${afterCommit || 'unknown'})`
     );
+
+    // Extract modified/added/removed files from commits if available
+    const commits = payload.commits || [];
+    const addedFiles: string[] = [];
+    const modifiedFiles: string[] = [];
+    const deletedFiles: string[] = [];
+
+    for (const c of commits) {
+      if (Array.isArray(c.added)) addedFiles.push(...c.added);
+      if (Array.isArray(c.modified)) modifiedFiles.push(...c.modified);
+      if (Array.isArray(c.removed)) deletedFiles.push(...c.removed);
+    }
+
+    const changedFilesMap = {
+      added: Array.from(new Set(addedFiles)),
+      modified: Array.from(new Set(modifiedFiles)),
+      deleted: Array.from(new Set(deletedFiles)),
+    };
 
     try {
       const { forwardPushEvent } = await import('@/lib/ai/client');
-      await forwardPushEvent(repoFullName, afterCommit, ref);
-      console.log(`[GitHub Webhook] Successfully notified AI service of push for ${repoFullName}`);
+      await forwardPushEvent(repoFullName, afterCommit, ref, changedFilesMap);
+      console.log(`[GitHub Webhook] Successfully enqueued incremental indexing for ${repoFullName}`);
     } catch (pushErr: any) {
       console.error(`[GitHub Webhook] Failed to forward push event to AI service: ${pushErr.message}`);
-      // Acknowledge webhook receipt to prevent GitHub retry flood
     }
 
     return NextResponse.json({
       status: 'success',
-      message: `Push event received and forwarded for repository ${repoFullName}`,
+      message: `Push event received and incremental indexing queued for repository ${repoFullName}`,
       repo: repoFullName,
       ref,
       headCommit: afterCommit,
     });
   }
+
 
   // 7. Handle all other unhandled events safely
   console.log(`[GitHub Webhook] Ignored unhandled event type: '${event}'`);

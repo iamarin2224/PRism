@@ -34,6 +34,7 @@ from app.rag import (
     qa_service,
 )
 from app.services.llm import SAMPLE_CODE_FOR_STRUCTURED_TEST, llm_service
+from app.workflow.langgraph_engine import workflow_engine
 
 logger = logging.getLogger("prism.ai")
 
@@ -186,6 +187,48 @@ class IndexWithFilesRequest(BaseModel):
 class PushEventPayload(BaseModel):
     repo_name: str
     new_head_sha: str
+    ref: Optional[str] = None
+    changed_files_map: Optional[dict] = None
+
+
+class ResumeReviewRequest(BaseModel):
+    approved_findings: Optional[List[dict]] = Field(default=None, description="List of approved findings")
+    routing_decision: Optional[str] = Field(default="POST_GITHUB", description="Routing decision (POST_GITHUB or DISMISSED)")
+
+
+@app.post("/api/reviews/{review_id}/resume")
+async def resume_review(review_id: str, request: ResumeReviewRequest):
+    """
+    Resumes a paused review workflow run from its checkpoint after Human-In-The-Loop approval.
+    Applies developer feedback and routes directly to post_review_github.
+    """
+    try:
+        human_input = {
+            "approved_findings": request.approved_findings,
+            "routing_decision": request.routing_decision,
+        }
+        resumed_state = await workflow_engine.resume(
+            review_run_id=review_id,
+            human_input=human_input,
+        )
+        return {
+            "status": "resumed",
+            "review_run_id": review_id,
+            "workflow_status": resumed_state.get("status"),
+            "routing_decision": resumed_state.get("routing_decision"),
+            "review_summary_markdown": resumed_state.get("review_summary_markdown"),
+        }
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(ve),
+        )
+    except Exception as e:
+        logger.error(f"Failed to resume review '{review_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to resume review workflow: {str(e)}",
+        )
 
 
 class RetrieveRequest(BaseModel):
@@ -256,15 +299,25 @@ async def get_index_status(repo_name: str = Query(..., description="Repository f
 async def handle_push_event(payload: PushEventPayload):
     """
     GitHub Push Webhook Handler:
-    Marks repository index STALE if new commit differs from indexed commit.
-    Does NOT automatically perform heavy indexing.
+    Marks repository index STALE and automatically enqueues asynchronous incremental indexing via ARQ.
     """
     try:
-        return await indexing_pipeline.mark_push_event(
+        state = await indexing_pipeline.mark_push_event(
             repo_name=payload.repo_name,
             new_head_sha=payload.new_head_sha,
         )
+        # Enqueue incremental indexing in background ARQ queue
+        await indexing_pipeline.schedule_indexing(
+            request=IndexingRequest(
+                repo_name=payload.repo_name,
+                commit_sha=payload.new_head_sha,
+                force_full=False,
+            ),
+            changed_files_map=payload.changed_files_map,
+        )
+        return state
     except Exception as e:
+        logger.error(f"Failed to process push event for {payload.repo_name}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process push event: {str(e)}",
