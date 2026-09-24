@@ -3,10 +3,12 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const { user, authenticated, hasInstallation, logout } = useAuth();
   const [connecting, setConnecting] = useState(false);
 
@@ -27,6 +29,44 @@ export function Sidebar() {
       console.error('Failed to get connect URL:', err);
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const handlePrefetch = (href: string) => {
+    if (href === '/') {
+      queryClient.prefetchQuery({
+        queryKey: ['repositories', 'tracked'],
+        queryFn: () => fetch('/api/repositories/tracked').then((r) => r.json()),
+        staleTime: 1000 * 20,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['reviews', 'list', { status: 'ALL', limit: 10 }],
+        queryFn: () => fetch('/api/reviews?limit=10').then((r) => r.json()),
+        staleTime: 1000 * 15,
+      });
+    } else if (href === '/repositories') {
+      queryClient.prefetchQuery({
+        queryKey: ['repositories', 'tracked'],
+        queryFn: () => fetch('/api/repositories/tracked').then((r) => r.json()),
+        staleTime: 1000 * 20,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['repositories', 'available'],
+        queryFn: () => fetch('/api/repositories/available').then((r) => r.json()),
+        staleTime: 1000 * 30,
+      });
+    } else if (href === '/reviews') {
+      queryClient.prefetchQuery({
+        queryKey: ['reviews', 'list', { status: 'ALL', limit: 50 }],
+        queryFn: () => fetch('/api/reviews?limit=50').then((r) => r.json()),
+        staleTime: 1000 * 15,
+      });
+    } else if (href === '/qa') {
+      queryClient.prefetchQuery({
+        queryKey: ['repositories', 'unified'],
+        queryFn: () => fetch('/api/repositories/unified').then((r) => r.json()),
+        staleTime: 1000 * 20,
+      });
     }
   };
 
@@ -127,6 +167,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onMouseEnter={() => handlePrefetch(item.href)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

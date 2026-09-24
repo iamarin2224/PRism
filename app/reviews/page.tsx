@@ -1,65 +1,23 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
-
-interface ReviewItem {
-  id: string;
-  repoName: string;
-  prNumber: number;
-  commitSha: string;
-  status: string;
-  routingDecision: string | null;
-  findingsCount: number;
-  eventsCount: number;
-  durationMs: number | null;
-  totalCostUsd: number;
-  createdAt: string;
-}
+import { useReviewsList } from '@/lib/hooks/useReviews';
 
 export default function ReviewsListPage() {
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchReviews = useCallback(async () => {
-    try {
-      setError(null);
-      const url = statusFilter !== 'ALL'
-        ? `/api/reviews?status=${encodeURIComponent(statusFilter)}&limit=50`
-        : '/api/reviews?limit=50';
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) {
-        throw new Error('Failed to fetch reviews list');
-      }
-      const data = await res.json();
-      setReviews(data.reviews || []);
-    } catch (err: any) {
-      setError(err.message || 'Error loading reviews');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+  const { data, isLoading, isError, error: queryError, refetch } = useReviewsList({
+    status: statusFilter,
+    limit: 50,
+  });
 
-  useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
-
-  // Auto-polling when reviews are in progress
-  useEffect(() => {
-    const hasRunning = reviews.some((r) => r.status === 'IN_PROGRESS' || r.status === 'QUEUED');
-    if (!hasRunning) return;
-
-    const interval = setInterval(() => {
-      fetchReviews();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [reviews, fetchReviews]);
+  const reviews = data?.reviews || [];
+  const loading = isLoading && reviews.length === 0;
+  const error = isError ? (queryError as Error)?.message || 'Error loading reviews' : null;
 
   const filteredReviews = reviews.filter((r) =>
     r.repoName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,7 +40,7 @@ export default function ReviewsListPage() {
         breadcrumbs={[{ label: 'PRism', href: '/' }, { label: 'Reviews' }]}
         actions={
           <button
-            onClick={fetchReviews}
+            onClick={() => refetch()}
             className="prism-btn prism-btn-secondary"
             title="Refresh reviews list"
           >
@@ -216,7 +174,7 @@ export default function ReviewsListPage() {
                       </span>
                     </td>
                     <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {rev.eventsCount}
+                      {rev.eventsCount ?? 0}
                     </td>
                     <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       {rev.durationMs ? `${(rev.durationMs / 1000).toFixed(1)}s` : '—'}

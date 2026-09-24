@@ -48,11 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshAuth = useCallback(async (sync = false) => {
+  const refreshAuth = useCallback(async () => {
     try {
       setLoading(true);
-      const url = sync ? '/api/auth/me?sync=true' : '/api/auth/me';
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch('/api/auth/me');
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -77,8 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Only runs on full page mount / browser refresh (Ctrl+R)
-    refreshAuth(true);
+    // Fast local session check on page mount
+    refreshAuth();
   }, [refreshAuth]);
 
   const logout = useCallback(async () => {

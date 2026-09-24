@@ -1,36 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { use } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
-
-interface RepoDetail {
-  id: string;
-  fullName: string;
-  owner: string;
-  name: string;
-  defaultBranch: string;
-  isPrivate: boolean;
-  isTracked: boolean;
-  indexStatus: string;
-  indexedCommit?: string | null;
-  currentCommit?: string | null;
-  lastIndexedAt?: string | null;
-  errorMessage?: string | null;
-}
-
-interface RepoReview {
-  id: string;
-  prNumber: number;
-  commitSha: string;
-  status: string;
-  routingDecision: string | null;
-  findingsCount: number;
-  eventsCount: number;
-  durationMs: number | null;
-  createdAt: string;
-}
+import { useRepositoryDetail, useReindexRepository } from '@/lib/hooks/useRepositories';
 
 export default function RepositoryDetailPage({
   params,
@@ -38,70 +12,25 @@ export default function RepositoryDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [repository, setRepository] = useState<RepoDetail | null>(null);
-  const [reviews, setReviews] = useState<RepoReview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [reindexing, setReindexing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchRepoDetail = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await fetch(`/api/repositories/${encodeURIComponent(id)}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to fetch repository details');
-      }
-      const data = await res.json();
-      setRepository(data.repository);
-      setReviews(data.reviews || []);
-    } catch (err: any) {
-      setError(err.message || 'Error loading repository');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const { data, isLoading, isError, error: queryError, refetch } = useRepositoryDetail(id);
+  const reindexMutation = useReindexRepository();
 
-  useEffect(() => {
-    fetchRepoDetail();
-  }, [fetchRepoDetail]);
-
-  // Auto-polling if repository is indexing
-  useEffect(() => {
-    if (repository?.indexStatus !== 'INDEXING') return;
-
-    const interval = setInterval(() => {
-      fetchRepoDetail();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [repository?.indexStatus, fetchRepoDetail]);
+  const repository = data?.repository;
+  const reviews = data?.reviews || [];
+  const error = isError ? (queryError as Error)?.message || 'Error loading repository' : null;
 
   const handleReindex = async () => {
     if (!repository) return;
     try {
-      setReindexing(true);
-      const res = await fetch('/api/repositories/reindex', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_id: repository.id }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to trigger reindexing');
-      }
-      setRepository((prev) => (prev ? { ...prev, indexStatus: 'INDEXING' } : prev));
-      await fetchRepoDetail();
+      await reindexMutation.mutateAsync(repository.id);
+      refetch();
     } catch (err: any) {
       alert(`Reindexing error: ${err.message}`);
-    } finally {
-      setReindexing(false);
     }
   };
 
-  if (loading) {
+  if (isLoading && !repository) {
     return (
       <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading repository information...
@@ -145,11 +74,11 @@ export default function RepositoryDetailPage({
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={handleReindex}
-              disabled={reindexing || repository.indexStatus === 'INDEXING'}
+              disabled={reindexMutation.isPending || repository.indexStatus === 'INDEXING'}
               className="prism-btn prism-btn-primary"
               style={{ fontSize: '12px' }}
             >
-              {repository.indexStatus === 'INDEXING' ? '⏳ Indexing in Background...' : '↻ Reindex'}
+              {repository.indexStatus === 'INDEXING' || reindexMutation.isPending ? '⏳ Indexing in Background...' : '↻ Reindex'}
             </button>
             <Link
               href={`/qa?repo=${encodeURIComponent(repository.fullName)}`}
@@ -270,7 +199,7 @@ export default function RepositoryDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {reviews.map((rev) => (
+                {reviews.map((rev: any) => (
                   <tr key={rev.id}>
                     <td>
                       <Link

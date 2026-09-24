@@ -1,102 +1,57 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthContext';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConnectGitHubBanner } from '@/components/ConnectGitHubBanner';
-
-interface ReviewSummary {
-  id: string;
-  repoName: string;
-  prNumber: number;
-  commitSha: string;
-  status: string;
-  routingDecision: string | null;
-  findingsCount: number;
-  durationMs: number | null;
-  createdAt: string;
-}
-
-interface RepoSummary {
-  id: string;
-  fullName: string;
-  isPrivate: boolean;
-  indexStatus: string;
-  lastIndexedAt: string | null;
-  totalReviewRuns: number;
-}
+import { useTrackedRepositories } from '@/lib/hooks/useRepositories';
+import { useReviewsList, useApproveReview } from '@/lib/hooks/useReviews';
 
 export default function DashboardPage() {
-  const { user, hasInstallation } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [reviews, setReviews] = useState<ReviewSummary[]>([]);
-  const [repositories, setRepositories] = useState<RepoSummary[]>([]);
+  const { hasInstallation } = useAuth();
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setError(null);
-      const [revRes, repoRes] = await Promise.all([
-        fetch('/api/reviews?limit=10', { cache: 'no-store' }),
-        fetch('/api/repositories/tracked', { cache: 'no-store' }),
-      ]);
+  // TanStack Query hooks for cached, instant-loading server state
+  const {
+    data: repoData,
+    isLoading: loadingRepos,
+    isError: isRepoError,
+    error: repoError,
+    refetch: refetchRepos,
+  } = useTrackedRepositories();
 
-      if (revRes.ok) {
-        const revData = await revRes.json();
-        setReviews(revData.reviews || []);
-      }
+  const {
+    data: reviewsData,
+    isLoading: loadingReviews,
+    isError: isRevError,
+    error: revError,
+    refetch: refetchReviews,
+  } = useReviewsList({ limit: 10 });
 
-      if (repoRes.ok) {
-        const repoData = await repoRes.json();
-        setRepositories(repoData.repositories || []);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard metrics');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const approveReviewMutation = useApproveReview();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  // Auto-poll if any reviews are running or any repositories are indexing
-  useEffect(() => {
-    const hasActiveReviews = reviews.some((r) => r.status === 'IN_PROGRESS' || r.status === 'QUEUED');
-    const hasActiveIndexing = repositories.some((r) => r.indexStatus === 'INDEXING');
-
-    if (!hasActiveReviews && !hasActiveIndexing) return;
-
-    const interval = setInterval(() => {
-      fetchDashboardData();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [reviews, repositories, fetchDashboardData]);
+  const repositories = repoData?.repositories || [];
+  const reviews = reviewsData?.reviews || [];
+  const loading = loadingRepos && loadingReviews && repositories.length === 0 && reviews.length === 0;
+  const error = (isRepoError && (repoError as Error)?.message) || (isRevError && (revError as Error)?.message) || null;
 
   // Quick 1-click HITL Approve from Dashboard
   const handleQuickApprove = async (reviewId: string) => {
     try {
       setApprovingId(reviewId);
-      const res = await fetch(`/api/reviews/${reviewId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ routing_decision: 'POST_GITHUB' }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to approve review');
-      }
-      await fetchDashboardData();
+      await approveReviewMutation.mutateAsync({ reviewId });
     } catch (err: any) {
       alert(`Approval failed: ${err.message}`);
     } finally {
       setApprovingId(null);
     }
+  };
+
+  const handleRefreshAll = () => {
+    refetchRepos();
+    refetchReviews();
   };
 
   // Metric Computations
@@ -114,7 +69,7 @@ export default function DashboardPage() {
         subtitle="Control & Telemetry Surface"
         actions={
           <button
-            onClick={fetchDashboardData}
+            onClick={handleRefreshAll}
             className="prism-btn prism-btn-secondary"
             title="Refresh dashboard metrics"
           >
@@ -286,7 +241,7 @@ export default function DashboardPage() {
                     </Link>
                     <button
                       onClick={() => handleQuickApprove(rev.id)}
-                      disabled={approvingId === rev.id}
+                      disabled={approvingId === rev.id || approveReviewMutation.isPending}
                       className="prism-btn prism-btn-primary"
                       style={{ fontSize: '12px', padding: '6px 12px' }}
                     >
@@ -315,7 +270,7 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {loading ? (
+            {loadingReviews && reviews.length === 0 ? (
               <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                 Loading reviews...
               </div>
@@ -385,7 +340,7 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {loading ? (
+            {loadingRepos && repositories.length === 0 ? (
               <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                 Loading repositories...
               </div>
@@ -428,7 +383,7 @@ export default function DashboardPage() {
                         {repo.fullName}
                       </Link>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {repo.totalReviewRuns} reviews • {repo.isPrivate ? 'Private' : 'Public'}
+                        {repo.totalReviewRuns ?? 0} reviews • {repo.isPrivate ? 'Private' : 'Public'}
                       </div>
                     </div>
 

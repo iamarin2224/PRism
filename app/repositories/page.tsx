@@ -1,101 +1,62 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthContext';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConnectGitHubBanner } from '@/components/ConnectGitHubBanner';
-
-interface RepoItem {
-  id: string;
-  fullName: string;
-  owner: string;
-  name: string;
-  defaultBranch?: string;
-  isPrivate: boolean;
-  isTracked: boolean;
-  indexStatus: string;
-  indexedCommit?: string | null;
-  currentCommit?: string | null;
-  lastIndexedAt?: string | null;
-  errorMessage?: string | null;
-  totalReviewRuns?: number;
-}
+import {
+  useTrackedRepositories,
+  useAvailableRepositories,
+  useTrackRepository,
+  useUntrackRepository,
+  useReindexRepository,
+  RepoSummary,
+} from '@/lib/hooks/useRepositories';
 
 export default function RepositoriesPage() {
   const { hasInstallation } = useAuth();
   const [activeTab, setActiveTab] = useState<'tracked' | 'available'>('tracked');
-  const [trackedRepos, setTrackedRepos] = useState<RepoItem[]>([]);
-  const [availableRepos, setAvailableRepos] = useState<RepoItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchRepositories = useCallback(async () => {
-    try {
-      setError(null);
-      const [trackedRes, availRes] = await Promise.all([
-        fetch('/api/repositories/tracked', { cache: 'no-store' }),
-        fetch('/api/repositories/available', { cache: 'no-store' }),
-      ]);
+  // TanStack Query hooks
+  const {
+    data: trackedData,
+    isLoading: loadingTracked,
+    isError: isTrackedError,
+    error: trackedError,
+    refetch: refetchTracked,
+  } = useTrackedRepositories();
 
-      if (trackedRes.ok) {
-        const trackedData = await trackedRes.json();
-        setTrackedRepos(trackedData.repositories || []);
-      }
+  const {
+    data: availableData,
+    isLoading: loadingAvailable,
+    isError: isAvailableError,
+    error: availableError,
+    refetch: refetchAvailable,
+  } = useAvailableRepositories();
 
-      if (availRes.ok) {
-        const availData = await availRes.json();
-        setAvailableRepos(availData.repositories || []);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch repositories');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const trackMutation = useTrackRepository();
+  const untrackMutation = useUntrackRepository();
+  const reindexMutation = useReindexRepository();
 
-  useEffect(() => {
-    fetchRepositories();
-  }, [fetchRepositories]);
+  const trackedRepos = trackedData?.repositories || [];
+  const availableRepos = availableData?.repositories || [];
+  const loading = activeTab === 'tracked' ? (loadingTracked && trackedRepos.length === 0) : (loadingAvailable && availableRepos.length === 0);
+  const error = (isTrackedError && (trackedError as Error)?.message) || (isAvailableError && (availableError as Error)?.message) || null;
 
-  // Auto-polling when any repository is actively indexing
-  useEffect(() => {
-    const isIndexing =
-      trackedRepos.some((r) => r.indexStatus === 'INDEXING') ||
-      availableRepos.some((r) => r.indexStatus === 'INDEXING');
-
-    if (!isIndexing) return;
-
-    const interval = setInterval(() => {
-      fetchRepositories();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [trackedRepos, availableRepos, fetchRepositories]);
+  const handleRefreshAll = () => {
+    refetchTracked();
+    refetchAvailable();
+  };
 
   // Track Action
-  const handleTrack = async (repo: RepoItem) => {
+  const handleTrack = async (repo: RepoSummary) => {
     try {
       setActionLoadingId(repo.id);
-      const res = await fetch('/api/repositories/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_id: repo.id, repo_name: repo.fullName }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to track repository');
-      }
-
-      // Optimistically update states
-      setAvailableRepos((prev) =>
-        prev.map((r) => (r.id === repo.id ? { ...r, isTracked: true, indexStatus: 'INDEXING' } : r))
-      );
-      await fetchRepositories();
+      await trackMutation.mutateAsync({ repoId: repo.id, repoName: repo.fullName });
     } catch (err: any) {
       alert(`Error tracking repository: ${err.message}`);
     } finally {
@@ -104,21 +65,12 @@ export default function RepositoriesPage() {
   };
 
   // Untrack Action
-  const handleUntrack = async (repo: RepoItem) => {
+  const handleUntrack = async (repo: RepoSummary) => {
     if (!confirm(`Are you sure you want to stop tracking ${repo.fullName}?`)) return;
 
     try {
       setActionLoadingId(repo.id);
-      const res = await fetch(`/api/repositories/track?repo_id=${encodeURIComponent(repo.id)}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to untrack repository');
-      }
-
-      await fetchRepositories();
+      await untrackMutation.mutateAsync(repo.id);
     } catch (err: any) {
       alert(`Error untracking repository: ${err.message}`);
     } finally {
@@ -127,25 +79,10 @@ export default function RepositoriesPage() {
   };
 
   // Reindex Action
-  const handleReindex = async (repo: RepoItem) => {
+  const handleReindex = async (repo: RepoSummary) => {
     try {
       setActionLoadingId(repo.id);
-      const res = await fetch('/api/repositories/reindex', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_id: repo.id }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to trigger reindexing');
-      }
-
-      // Optimistically update state
-      setTrackedRepos((prev) =>
-        prev.map((r) => (r.id === repo.id ? { ...r, indexStatus: 'INDEXING' } : r))
-      );
-      await fetchRepositories();
+      await reindexMutation.mutateAsync(repo.id);
     } catch (err: any) {
       alert(`Error reindexing repository: ${err.message}`);
     } finally {
@@ -170,7 +107,7 @@ export default function RepositoriesPage() {
         breadcrumbs={[{ label: 'PRism', href: '/' }, { label: 'Repositories' }]}
         actions={
           <button
-            onClick={fetchRepositories}
+            onClick={handleRefreshAll}
             className="prism-btn prism-btn-secondary"
             title="Refresh repository status"
           >
@@ -326,7 +263,7 @@ export default function RepositoriesPage() {
                           </Link>
                           <button
                             onClick={() => handleReindex(repo)}
-                            disabled={actionLoadingId === repo.id || repo.indexStatus === 'INDEXING'}
+                            disabled={actionLoadingId === repo.id || repo.indexStatus === 'INDEXING' || reindexMutation.isPending}
                             className="prism-btn prism-btn-secondary"
                             style={{ fontSize: '11px', padding: '4px 8px' }}
                             title="Trigger full re-indexing of this repository"
@@ -337,7 +274,7 @@ export default function RepositoriesPage() {
                           </button>
                           <button
                             onClick={() => handleUntrack(repo)}
-                            disabled={actionLoadingId === repo.id}
+                            disabled={actionLoadingId === repo.id || untrackMutation.isPending}
                             className="prism-btn prism-btn-danger"
                             style={{ fontSize: '11px', padding: '4px 8px' }}
                           >
@@ -420,7 +357,7 @@ export default function RepositoriesPage() {
                         ) : (
                           <button
                             onClick={() => handleTrack(repo)}
-                            disabled={actionLoadingId === repo.id}
+                            disabled={actionLoadingId === repo.id || trackMutation.isPending}
                             className="prism-btn prism-btn-primary"
                             style={{ fontSize: '11px', padding: '5px 12px' }}
                           >

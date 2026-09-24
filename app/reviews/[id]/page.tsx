@@ -1,36 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { useState, use } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
-import { FindingCard, FindingData } from '@/components/FindingCard';
-import { Timeline, TimelineEvent } from '@/components/Timeline';
-
-interface ReviewDetailData {
-  id: string;
-  repositoryId?: string | null;
-  repoName: string;
-  repository?: {
-    id: string;
-    fullName: string;
-    owner: string;
-    name: string;
-  } | null;
-  prNumber: number;
-  commitSha: string;
-  baseSha: string;
-  status: string;
-  routingDecision: string | null;
-  totalTokensIn?: number;
-  totalTokensOut?: number;
-  totalCostUsd?: number;
-  durationMs?: number | null;
-  errorMessage?: string | null;
-  findings: FindingData[];
-  createdAt: string;
-  updatedAt: string;
-}
+import { FindingCard } from '@/components/FindingCard';
+import { Timeline } from '@/components/Timeline';
+import { useReviewDetail, useApproveReview } from '@/lib/hooks/useReviews';
 
 export default function ReviewDetailPage({
   params,
@@ -38,78 +14,26 @@ export default function ReviewDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [review, setReview] = useState<ReviewDetailData | null>(null);
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'findings' | 'events'>('overview');
-  const [loading, setLoading] = useState(true);
-  const [approving, setApproving] = useState(false);
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchReviewData = useCallback(async () => {
-    try {
-      setError(null);
-      const [revRes, evRes] = await Promise.all([
-        fetch(`/api/reviews/${id}`, { cache: 'no-store' }),
-        fetch(`/api/reviews/${id}/events`, { cache: 'no-store' }),
-      ]);
+  const { data, isLoading, isError, error: queryError, refetch } = useReviewDetail(id);
+  const approveMutation = useApproveReview();
 
-      if (!revRes.ok) {
-        const err = await revRes.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to fetch review');
-      }
-
-      const revData = await revRes.json();
-      setReview(revData.review);
-
-      if (evRes.ok) {
-        const evData = await evRes.json();
-        setEvents(evData.events || []);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error loading review');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchReviewData();
-  }, [fetchReviewData]);
-
-  // Auto-polling if review is still in progress
-  useEffect(() => {
-    if (review?.status !== 'IN_PROGRESS' && review?.status !== 'QUEUED') return;
-
-    const interval = setInterval(() => {
-      fetchReviewData();
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [review?.status, fetchReviewData]);
+  const review = data?.review;
+  const events = data?.events || [];
+  const loading = isLoading && !review;
+  const error = isError ? (queryError as Error)?.message || 'Error loading review' : null;
 
   // HITL Approval Handler
   const handleApprove = async () => {
     if (!review) return;
     try {
-      setApproving(true);
-      const res = await fetch(`/api/reviews/${review.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ routing_decision: 'POST_GITHUB' }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to approve and resume review');
-      }
-
-      await fetchReviewData();
+      await approveMutation.mutateAsync({ reviewId: review.id });
+      refetch();
     } catch (err: any) {
       alert(`Approval error: ${err.message}`);
-    } finally {
-      setApproving(false);
     }
   };
 
@@ -248,7 +172,7 @@ ${
               {copiedMarkdown ? '✓ Copied Markdown' : '📋 Copy GitHub Report'}
             </button>
             <button
-              onClick={fetchReviewData}
+              onClick={() => refetch()}
               className="prism-btn prism-btn-secondary"
               title="Refresh review data"
             >
@@ -297,7 +221,7 @@ ${
 
             <button
               onClick={handleApprove}
-              disabled={approving}
+              disabled={approveMutation.isPending}
               className="prism-btn prism-btn-primary"
               style={{
                 fontSize: '13px',
@@ -308,7 +232,7 @@ ${
                 flexShrink: 0,
               }}
             >
-              {approving ? 'Posting to GitHub...' : 'Approve & Post Review'}
+              {approveMutation.isPending ? 'Posting to GitHub...' : 'Approve & Post Review'}
             </button>
           </div>
         )}
