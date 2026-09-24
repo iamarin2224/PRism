@@ -30,6 +30,8 @@ model User {
   installations  Installation[]
   accounts       Account[]
   sessions       Session[]
+  exploredRepos  UserExploredRepo[]
+  conversations  Conversation[]
 
   @@map("users")
 }
@@ -106,10 +108,65 @@ model Repository {
 
   installation   Installation? @relation(fields: [installationId], references: [installationId], onDelete: SetNull)
   reviewRuns     ReviewRun[]
+  exploredBy     UserExploredRepo[]
+  conversations  Conversation[]
 
   @@index([installationId], name: "repositories_installation_idx")
   @@index([isTracked], name: "repositories_tracked_idx")
   @@map("repositories")
+}
+
+model UserExploredRepo {
+  id           String      @id @default(uuid())
+  userId       String      @map("user_id")
+  repositoryId String      @map("repository_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId])
+  @@index([userId], name: "user_explored_repos_user_idx")
+  @@index([repositoryId], name: "user_explored_repos_repo_idx")
+  @@map("user_explored_repos")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Conversation {
+  id           String       @id @default(uuid())
+  userId       String       @map("user_id")
+  repositoryId String?      @map("repository_id")
+  repoName     String       @map("repo_name")
+  title        String       @default("New Conversation")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository?  @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  messages     Message[]
+
+  @@index([userId], name: "conversations_user_idx")
+  @@index([userId, repoName], name: "conversations_user_repo_idx")
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String        @map("conversation_id")
+  role           MessageRole   @default(USER)
+  content        String
+  sources        Json?
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId], name: "messages_conversation_idx")
+  @@map("messages")
 }
 
 

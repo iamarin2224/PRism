@@ -1,422 +1,866 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
+import { AddRepositoryModal } from '@/components/AddRepositoryModal';
+import {
+  useUnifiedRepositories,
+  useConversations,
+  useConversation,
+  useCreateConversation,
+  useSendMessage,
+  useDeleteConversation,
+  useDeleteExploredRepo,
+  RepositoryItem,
+} from '@/lib/hooks/useQaChat';
 
-interface TrackedRepo {
-  id: string;
-  fullName: string;
-  indexStatus: string;
-  lastIndexedAt?: string | null;
-}
-
-interface QASource {
-  file_path: string;
-  start_line: number;
-  end_line: number;
-  similarity_score?: number;
-  content?: string;
-}
-
-interface QAResponseData {
-  answer: string;
-  sources: QASource[];
-}
-
-function CodeQAContent() {
+function CodeQAChatContent() {
   const searchParams = useSearchParams();
-  const initialRepo = searchParams.get('repo') || '';
+  const router = useRouter();
+  const initialRepoParam = searchParams.get('repo');
+  const initialConvParam = searchParams.get('conversation');
 
-  const [repositories, setRepositories] = useState<TrackedRepo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState<string>(initialRepo);
-  const [query, setQuery] = useState('');
-  const [loadingRepos, setLoadingRepos] = useState(true);
-  const [querying, setQuerying] = useState(false);
-  const [qaResult, setQaResult] = useState<QAResponseData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<string>(initialRepoParam || '');
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConvParam || null);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
 
-  const fetchTrackedRepositories = useCallback(async () => {
-    try {
-      const res = await fetch('/api/repositories/tracked', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const repos = data.repositories || [];
-        setRepositories(repos);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-        // Auto-select initial repo or first indexed repo
-        if (!selectedRepo && repos.length > 0) {
-          const firstIndexed = repos.find((r: TrackedRepo) => r.indexStatus === 'INDEXED') || repos[0];
-          setSelectedRepo(firstIndexed.fullName);
-        } else if (selectedRepo && !repos.find((r: TrackedRepo) => r.fullName === selectedRepo)) {
-          if (repos.length > 0) setSelectedRepo(repos[0].fullName);
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch tracked repositories');
-    } finally {
-      setLoadingRepos(false);
-    }
-  }, [selectedRepo]);
+  // Queries
+  const { data: repoData, isLoading: loadingRepos, refetch: refetchRepos } = useUnifiedRepositories();
+  const { data: conversations, isLoading: loadingConvs, refetch: refetchConvs } = useConversations(selectedRepo);
+  const { data: currentConversation, isLoading: loadingMessages } = useConversation(activeConversationId);
 
+  // Mutations
+  const createConvMutation = useCreateConversation();
+  const sendMessageMutation = useSendMessage();
+  const deleteConvMutation = useDeleteConversation();
+  const deleteExploredMutation = useDeleteExploredRepo();
+
+  // Combine repos
+  const allRepos: RepositoryItem[] = [
+    ...(repoData?.myRepos || []),
+    ...(repoData?.exploredRepos || []),
+  ];
+
+  const activeRepo = allRepos.find((r) => r.fullName === selectedRepo);
+
+  // Auto-select first repo if none selected
   useEffect(() => {
-    fetchTrackedRepositories();
-  }, [fetchTrackedRepositories]);
+    if (!selectedRepo && allRepos.length > 0) {
+      const firstIndexed = allRepos.find((r) => r.indexStatus === 'INDEXED') || allRepos[0];
+      setSelectedRepo(firstIndexed.fullName);
+    }
+  }, [allRepos, selectedRepo]);
 
-  const activeRepo = repositories.find((r) => r.fullName === selectedRepo);
+  // Auto-select first conversation or handle active conversation
+  useEffect(() => {
+    if (selectedRepo && conversations && conversations.length > 0 && !activeConversationId) {
+      setActiveConversationId(conversations[0].id);
+    }
+  }, [selectedRepo, conversations, activeConversationId]);
+
+  // Scroll to bottom of chat when new message arrives
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentConversation?.messages, sendMessageMutation.isPending]);
+
+  const handleSelectRepo = (repoFullName: string) => {
+    setSelectedRepo(repoFullName);
+    setActiveConversationId(null);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('repo', repoFullName);
+    newUrl.searchParams.delete('conversation');
+    router.replace(newUrl.pathname + newUrl.search);
+  };
+
+  const handleSelectConversation = (convId: string) => {
+    setActiveConversationId(convId);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('repo', selectedRepo);
+    newUrl.searchParams.set('conversation', convId);
+    router.replace(newUrl.pathname + newUrl.search);
+  };
+
+  const handleNewConversation = async () => {
+    if (!selectedRepo) return;
+    try {
+      const newConv = await createConvMutation.mutateAsync({
+        repoName: selectedRepo,
+        title: 'New Conversation',
+      });
+      setActiveConversationId(newConv.id);
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('repo', selectedRepo);
+      newUrl.searchParams.set('conversation', newConv.id);
+      router.replace(newUrl.pathname + newUrl.search);
+    } catch (err) {
+      console.error('Failed to create conversation:', err);
+    }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const content = inputMessage.trim();
+    if (!content || !selectedRepo) return;
+
+    try {
+      let targetConvId = activeConversationId;
+
+      // If no conversation exists yet, auto-create one
+      if (!targetConvId) {
+        const newConv = await createConvMutation.mutateAsync({
+          repoName: selectedRepo,
+          title: content.length > 35 ? `${content.slice(0, 32)}...` : content,
+        });
+        targetConvId = newConv.id;
+        setActiveConversationId(newConv.id);
+      }
+
+      if (!targetConvId) return;
+
+      setInputMessage('');
+      await sendMessageMutation.mutateAsync({
+        conversationId: targetConvId,
+        content,
+        repoName: selectedRepo,
+      });
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleReindex = async () => {
+    if (!selectedRepo) return;
+    try {
+      setReindexing(true);
+      await fetch('/api/rag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'index',
+          repo_name: selectedRepo,
+          force_full: true,
+        }),
+      });
+      await refetchRepos();
+    } catch (err) {
+      console.error('Reindex error:', err);
+    } finally {
+      setReindexing(false);
+    }
+  };
+
+  const samplePrompts = [
+    'What is the core architecture and workflow of this project?',
+    'How is authentication and session management implemented?',
+    'Explain the database models and vector indexing strategy.',
+    'Where are API routes and external webhook listeners defined?',
+  ];
+
   const isIndexing = activeRepo?.indexStatus === 'INDEXING';
   const isStale = activeRepo?.indexStatus === 'STALE';
   const isNotIndexed = activeRepo?.indexStatus === 'NOT_INDEXED' || activeRepo?.indexStatus === 'FAILED';
 
-  const handleAsk = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!selectedRepo || !query.trim()) return;
-
-    if (isIndexing) {
-      setError('Indexing is currently in progress for this repository. Q&A will be available when indexing completes.');
-      return;
-    }
-
-    try {
-      setQuerying(true);
-      setError(null);
-      setQaResult(null);
-
-      const res = await fetch('/api/rag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'query',
-          repo_name: selectedRepo,
-          query: query.trim(),
-          top_k: 5,
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || errData.detail || 'Q&A query execution failed');
-      }
-
-      const data = await res.json();
-      setQaResult(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to query codebase');
-    } finally {
-      setQuerying(false);
-    }
-  };
-
-  const sampleQueries = [
-    'What handles GitHub webhook verification?',
-    'How does authentication and session management work?',
-    'Explain the LangGraph review engine topology and nodes.',
-    'Where is the Redis ARQ queue worker implemented?',
-  ];
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Header
         title="Code Q&A"
-        subtitle="RAG Knowledge Engine"
+        subtitle="Conversational Codebase Intelligence"
         breadcrumbs={[{ label: 'PRism', href: '/' }, { label: 'Code Q&A' }]}
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px' }}>
-        {/* Repo Selector Header Card */}
-        <div className="prism-card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '240px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                SELECT TARGET REPOSITORY:
-              </label>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* LEFT SIDEBAR: Repositories Tree & Conversations List */}
+        <aside
+          style={{
+            width: '320px',
+            minWidth: '320px',
+            backgroundColor: '#0b1329',
+            borderRight: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Section 1: Repositories List */}
+          <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                REPOSITORIES
+              </span>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="prism-btn prism-btn-secondary"
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                title="Add tracked or public repository"
+              >
+                + Add Repo
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
               {loadingRepos ? (
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading tracked repositories...</div>
-              ) : repositories.length === 0 ? (
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  No tracked repositories found.{' '}
-                  <a href="/repositories" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
-                    Track a repository first
-                  </a>.
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px' }}>Loading repositories...</div>
+              ) : allRepos.length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px' }}>
+                  No repositories found.{' '}
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    Add one now
+                  </button>
                 </div>
               ) : (
-                <select
-                  value={selectedRepo}
-                  onChange={(e) => setSelectedRepo(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'var(--code-bg)',
-                    color: 'var(--text-h)',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {repositories.map((repo) => (
-                    <option key={repo.id} value={repo.fullName}>
-                      {repo.fullName} ({repo.indexStatus})
-                    </option>
-                  ))}
-                </select>
+                <>
+                  {/* My Indexed Repositories */}
+                  <div>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', opacity: 0.8, marginBottom: '4px', textTransform: 'uppercase' }}>
+                      ├── My Tracked Repositories ({repoData?.myRepos?.length || 0})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                      {repoData?.myRepos?.map((r) => {
+                        const isSelected = selectedRepo === r.fullName;
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => handleSelectRepo(r.fullName)}
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                              border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                              transition: 'all 0.1s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                              <span style={{ fontSize: '13px' }}>⑂</span>
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: isSelected ? 600 : 400,
+                                  color: isSelected ? '#ffffff' : 'var(--text)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={r.fullName}
+                              >
+                                {r.name}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '9px',
+                                fontWeight: 600,
+                                padding: '1px 5px',
+                                borderRadius: '3px',
+                                backgroundColor: r.indexStatus === 'INDEXED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: r.indexStatus === 'INDEXED' ? '#34d399' : '#fbbf24',
+                              }}
+                            >
+                              {r.indexStatus}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {(!repoData?.myRepos || repoData.myRepos.length === 0) && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None tracked yet</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Explored Repositories */}
+                  <div>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', opacity: 0.8, marginBottom: '4px', textTransform: 'uppercase' }}>
+                      └── Explored Repositories ({repoData?.exploredRepos?.length || 0})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                      {repoData?.exploredRepos?.map((r) => {
+                        const isSelected = selectedRepo === r.fullName;
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => handleSelectRepo(r.fullName)}
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                              border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                              transition: 'all 0.1s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
+                              <span style={{ fontSize: '13px' }}>🌐</span>
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: isSelected ? 600 : 400,
+                                  color: isSelected ? '#ffffff' : 'var(--text)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={r.fullName}
+                              >
+                                {r.fullName}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  fontWeight: 600,
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  backgroundColor: r.indexStatus === 'INDEXED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                  color: r.indexStatus === 'INDEXED' ? '#34d399' : '#fbbf24',
+                                }}
+                              >
+                                {r.indexStatus}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteExploredMutation.mutate(r.id);
+                                }}
+                                title="Remove explored repo"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  padding: '2px',
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {(!repoData?.exploredRepos || repoData.exploredRepos.length === 0) && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None explored yet</div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
+            </div>
+          </div>
+
+          {/* Section 2: Conversations History */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div
+              style={{
+                padding: '14px 16px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                  CHATS ({conversations?.length || 0})
+                </span>
+                {selectedRepo && (
+                  <div style={{ fontSize: '11px', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                    {selectedRepo}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleNewConversation}
+                disabled={!selectedRepo || createConvMutation.isPending}
+                className="prism-btn prism-btn-primary"
+                style={{ fontSize: '11px', padding: '4px 10px' }}
+              >
+                + New Chat
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              {loadingConvs ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '12px', textAlign: 'center' }}>
+                  Loading chat history...
+                </div>
+              ) : !selectedRepo ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px', textAlign: 'center' }}>
+                  Select a repository to view conversations.
+                </div>
+              ) : conversations?.length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px', textAlign: 'center' }}>
+                  No chats yet for this repository.{' '}
+                  <button
+                    onClick={handleNewConversation}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    Start one!
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {conversations?.map((conv) => {
+                    const isActive = activeConversationId === conv.id;
+                    return (
+                      <div
+                        key={conv.id}
+                        onClick={() => handleSelectConversation(conv.id)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          backgroundColor: isActive ? 'var(--surface-hover)' : 'transparent',
+                          border: isActive ? '1px solid var(--accent-border)' : '1px solid transparent',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ overflow: 'hidden', flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: isActive ? 600 : 500,
+                              color: isActive ? '#ffffff' : 'var(--text)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            💬 {conv.title}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {new Date(conv.updatedAt).toLocaleDateString()} • {conv.messageCount} msgs
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConvMutation.mutate({ conversationId: conv.id, repoName: selectedRepo });
+                            if (activeConversationId === conv.id) {
+                              setActiveConversationId(null);
+                            }
+                          }}
+                          title="Delete conversation"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            padding: '2px 4px',
+                            opacity: 0.6,
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* MAIN CHAT AREA */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflow: 'hidden' }}>
+          {/* Target Repo Top Bar */}
+          <div
+            style={{
+              padding: '12px 24px',
+              borderBottom: '1px solid var(--border)',
+              backgroundColor: 'var(--surface)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>TARGET CODEBASE:</span>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{selectedRepo || 'No repository selected'}</span>
+                  {activeRepo && <StatusBadge type="index" value={activeRepo.indexStatus} size="sm" />}
+                </div>
+              </div>
             </div>
 
             {activeRepo && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <StatusBadge type="index" value={activeRepo.indexStatus} size="md" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {activeRepo.lastIndexedAt && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Synced {new Date(activeRepo.lastIndexedAt).toLocaleDateString()}
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Last indexed: {new Date(activeRepo.lastIndexedAt).toLocaleDateString()}
                   </span>
                 )}
+                <button
+                  onClick={handleReindex}
+                  disabled={reindexing || isIndexing}
+                  className="prism-btn prism-btn-secondary"
+                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                >
+                  {reindexing || isIndexing ? '⏳ Indexing...' : '↻ Re-index'}
+                </button>
               </div>
             )}
           </div>
 
-          {/* Indexing warnings */}
+          {/* Status Warning Banners */}
           {isIndexing && (
             <div
               style={{
-                marginTop: '14px',
-                padding: '10px 14px',
-                borderRadius: '6px',
+                padding: '10px 24px',
                 backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.35)',
+                borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
                 color: '#fbbf24',
                 fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              ⏳ Indexing is currently running in the background. Semantic Q&A will be available as soon as chunk embeddings complete.
+              ⏳ Indexing is running in the background. Embeddings will be queried as soon as chunk generation completes.
             </div>
           )}
 
           {isStale && (
             <div
               style={{
-                marginTop: '14px',
-                padding: '10px 14px',
-                borderRadius: '6px',
+                padding: '10px 24px',
                 backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
                 color: '#facc15',
                 fontSize: '12px',
               }}
             >
-              ⚠ Repository has new push events since last full sync. Answers will reflect the last indexed commit.
+              ⚠ Repository has new commits since last indexing. Query results reflect commit {activeRepo?.indexedCommit?.slice(0, 7) || 'previous'}.
             </div>
           )}
 
           {isNotIndexed && (
             <div
               style={{
-                marginTop: '14px',
-                padding: '10px 14px',
-                borderRadius: '6px',
+                padding: '10px 24px',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
                 color: '#f87171',
                 fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              ✕ Repository is not yet indexed in vector store.{' '}
-              <a href="/repositories" style={{ color: '#ffffff', textDecoration: 'underline' }}>
-                Trigger indexing from Repositories page
-              </a>.
+              <span>✕ Repository is not yet indexed in vector store.</span>
+              <button
+                onClick={handleReindex}
+                disabled={reindexing}
+                className="prism-btn prism-btn-primary"
+                style={{ fontSize: '11px', padding: '4px 10px' }}
+              >
+                Trigger Indexing Now →
+              </button>
             </div>
           )}
-        </div>
 
-        {/* Question Input Card */}
-        <form onSubmit={handleAsk} className="prism-card" style={{ padding: '20px' }}>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '8px' }}>
-              Ask anything about this codebase:
-            </label>
-            <textarea
-              rows={3}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. What handles GitHub webhook verification and HMAC security?"
-              disabled={querying || !selectedRepo || isIndexing}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--code-bg)',
-                color: 'var(--text-h)',
-                fontSize: '14px',
-                lineHeight: 1.5,
-                outline: 'none',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            {/* Quick Sample Queries */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {sampleQueries.map((sample, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setQuery(sample)}
-                  style={{
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--surface-hover)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-muted)',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-h)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                >
-                  {sample}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="submit"
-              disabled={querying || !query.trim() || !selectedRepo || isIndexing}
-              className="prism-btn prism-btn-primary"
-              style={{ fontSize: '13px', padding: '9px 20px' }}
-            >
-              {querying ? 'Searching & Reasoning...' : 'Ask Codebase →'}
-            </button>
-          </div>
-        </form>
-
-        {/* Error message */}
-        {error && (
-          <div
-            style={{
-              padding: '12px 16px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--status-red-bg)',
-              border: '1px solid var(--status-red-border)',
-              color: 'var(--status-red)',
-              fontSize: '13px',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Q&A Result Display */}
-        {qaResult && (
-          <div className="prism-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <div
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: 'var(--accent-cyan)',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  marginBottom: '10px',
-                }}
-              >
-                Grounded AI Answer
+          {/* Messages Scroll Area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {!selectedRepo ? (
+              <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '480px' }}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>💬</div>
+                <h3 style={{ fontSize: '18px', color: 'var(--text-h)', margin: '0 0 8px' }}>Select a Repository</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                  Choose a tracked codebase or explore any public GitHub repository to start asking questions grounded in source code embeddings.
+                </p>
               </div>
-              <div
-                style={{
-                  fontSize: '14px',
-                  lineHeight: 1.7,
-                  color: '#f1f5f9',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {qaResult.answer}
+            ) : loadingMessages ? (
+              <div style={{ margin: 'auto', color: 'var(--text-muted)', fontSize: '13px' }}>
+                Loading conversation messages...
               </div>
-            </div>
-
-            {/* Sources Referenced */}
-            {qaResult.sources && qaResult.sources.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                <div
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                    marginBottom: '10px',
-                  }}
-                >
-                  Referenced Code Sources ({qaResult.sources.length})
-                </div>
+            ) : (!currentConversation?.messages || currentConversation.messages.length === 0) ? (
+              <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '540px' }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>⚡</div>
+                <h3 style={{ fontSize: '18px', color: 'var(--text-h)', margin: '0 0 8px' }}>
+                  Ask anything about {selectedRepo}
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '20px' }}>
+                  PRism retrieves code chunks via pgvector cosine similarity search and provides grounded, multi-file code explanations with direct source references.
+                </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {qaResult.sources.map((src, idx) => (
-                    <div
+                  {samplePrompts.map((prompt, idx) => (
+                    <button
                       key={idx}
+                      onClick={() => setInputMessage(prompt)}
                       style={{
-                        padding: '10px 12px',
+                        padding: '10px 14px',
                         borderRadius: '6px',
-                        backgroundColor: 'var(--code-bg)',
+                        backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
+                        color: 'var(--text)',
                         fontSize: '12px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--accent)';
+                        e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.color = 'var(--text)';
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)', fontWeight: 600 }}>
-                          📄 {src.file_path}
-                        </span>
-                        <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--mono)', fontSize: '11px' }}>
-                          Lines {src.start_line}–{src.end_line}
-                          {src.similarity_score !== undefined && (
-                            <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>
-                              ({(src.similarity_score * 100).toFixed(0)}% match)
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      {src.content && (
-                        <pre
-                          style={{
-                            margin: 0,
-                            padding: '8px 10px',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            color: '#94a3b8',
-                            fontSize: '11px',
-                            overflowX: 'auto',
-                            maxHeight: '120px',
-                          }}
-                        >
-                          <code>{src.content}</code>
-                        </pre>
-                      )}
-                    </div>
+                      💡 {prompt}
+                    </button>
                   ))}
                 </div>
               </div>
+            ) : (
+              currentConversation.messages.map((msg) => {
+                const isUser = msg.role === 'USER';
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: isUser ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: isUser ? 'var(--accent)' : 'var(--accent-cyan)',
+                      }}
+                    >
+                      <span>{isUser ? '👤 You' : '✨ PRism Intelligence'}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    <div
+                      className={isUser ? 'prism-card' : 'prism-card'}
+                      style={{
+                        maxWidth: '85%',
+                        padding: '16px 20px',
+                        borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        backgroundColor: isUser ? 'rgba(168, 85, 247, 0.12)' : '#0f172a',
+                        border: isUser ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid var(--border)',
+                        color: isUser ? '#ffffff' : '#f1f5f9',
+                        fontSize: '14px',
+                        lineHeight: 1.65,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {msg.content}
+
+                      {/* Referenced Code Sources */}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: 'var(--text-muted)',
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                              marginBottom: '8px',
+                            }}
+                          >
+                            Referenced Code Sources ({msg.sources.length})
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {msg.sources.map((src, sIdx) => (
+                              <div
+                                key={sIdx}
+                                style={{
+                                  padding: '8px 10px',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'var(--code-bg)',
+                                  border: '1px solid var(--border)',
+                                  fontSize: '12px',
+                                  fontFamily: 'var(--mono)',
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📄 {src.file_path}</span>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                                    Lines {src.start_line}–{src.end_line}
+                                    {src.similarity_score !== undefined && (
+                                      <span style={{ marginLeft: '6px' }}>
+                                        ({(src.similarity_score * 100).toFixed(0)}% match)
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                                {src.content && (
+                                  <pre
+                                    style={{
+                                      margin: '6px 0 0',
+                                      padding: '6px 8px',
+                                      borderRadius: '4px',
+                                      backgroundColor: 'var(--surface)',
+                                      border: '1px solid var(--border)',
+                                      color: '#94a3b8',
+                                      fontSize: '11px',
+                                      overflowX: 'auto',
+                                      maxHeight: '100px',
+                                    }}
+                                  >
+                                    <code>{src.content}</code>
+                                  </pre>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
+
+            {/* Pending Assistant Message */}
+            {sendMessageMutation.isPending && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px' }}>
+                  ✨ PRism Intelligence
+                </div>
+                <div
+                  className="prism-card"
+                  style={{
+                    padding: '14px 18px',
+                    borderRadius: '12px 12px 12px 2px',
+                    backgroundColor: '#0f172a',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    color: '#94a3b8',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent-cyan)',
+                      animation: 'pulse 1.2s infinite',
+                    }}
+                  />
+                  <span>Searching vector embeddings and synthesizing answer...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
-        )}
+
+          {/* Sticky Bottom Input Bar */}
+          <div
+            style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--border)',
+              backgroundColor: 'var(--surface)',
+            }}
+          >
+            <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+              <textarea
+                rows={2}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  selectedRepo
+                    ? `Ask anything about ${selectedRepo}... (Enter to send, Shift+Enter for newline)`
+                    : 'Select a repository above first...'
+                }
+                disabled={!selectedRepo || sendMessageMutation.isPending}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--code-bg)',
+                  color: 'var(--text-h)',
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  outline: 'none',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                }}
+              />
+
+              <button
+                type="submit"
+                disabled={!selectedRepo || !inputMessage.trim() || sendMessageMutation.isPending}
+                className="prism-btn prism-btn-primary"
+                style={{ padding: '10px 20px', fontSize: '13px', height: '44px', flexShrink: 0 }}
+              >
+                {sendMessageMutation.isPending ? 'Searching...' : 'Send →'}
+              </button>
+            </form>
+          </div>
+        </main>
       </div>
+
+      {/* Add Repository Modal */}
+      <AddRepositoryModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSelectRepo={(repoFullName) => {
+          handleSelectRepo(repoFullName);
+          refetchRepos();
+        }}
+      />
     </div>
   );
 }
 
 export default function CodeQAPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '40px', color: 'var(--text-muted)' }}>Loading Q&A...</div>}>
-      <CodeQAContent />
+    <Suspense fallback={<div style={{ padding: '40px', color: 'var(--text-muted)' }}>Loading Code Q&A...</div>}>
+      <CodeQAChatContent />
     </Suspense>
   );
 }

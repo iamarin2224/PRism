@@ -35,7 +35,6 @@ export function Sidebar() {
     { label: 'Repositories', href: '/repositories', icon: '⑂' },
     { label: 'Reviews', href: '/reviews', icon: '✓' },
     { label: 'Code Q&A', href: '/qa', icon: '💬' },
-    { label: 'Explore Repository', href: '/explore', icon: '⌕' },
   ];
 
   return (
