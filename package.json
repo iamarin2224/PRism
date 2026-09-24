@@ -10,6 +10,7 @@
     "lint": "next lint",
     "dev:all": "./dev.sh",
     "dev:ai": "cd ai && ([ -f .venv/bin/uvicorn ] && .venv/bin/uvicorn app.main:app --port 8000 --reload || uvicorn app.main:app --port 8000 --reload)",
+    "dev:worker": "cd ai && ([ -f .venv/bin/arq ] && .venv/bin/arq app.queue.worker.WorkerSettings || arq app.queue.worker.WorkerSettings)",
     "test:webhook": "node scripts/test-webhook.js"
   },
   "dependencies": {

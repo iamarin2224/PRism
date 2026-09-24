@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/components/AuthContext';
+import { AppShell } from '@/components/AppShell';
 
 export const metadata: Metadata = {
-  title: 'PRism — Agentic Pull Request Review System',
-  description: 'Intelligent multi-stage agentic pull request review system',
+  title: 'PRism — Agentic Code Intelligence',
+  description: 'Autonomous multi-agent pull request review system and codebase knowledge engine',
 };
 
 export default function RootLayout({
@@ -14,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="main-container">{children}</div>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

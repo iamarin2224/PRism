@@ -22,7 +22,15 @@ export async function GET(req: NextRequest) {
   try {
     const accessToken = await exchangeOAuthCode(code);
     const githubProfile = await fetchGitHubUser(accessToken);
-    await createAuthenticatedUserSession(githubProfile, accessToken);
+    const sessionUser = await createAuthenticatedUserSession(githubProfile, accessToken);
+
+    // Auto-detect and sync any existing GitHub App installations for this user
+    try {
+      const { syncUserInstallations } = await import('@/lib/github/app');
+      await syncUserInstallations(sessionUser.id, sessionUser.githubUsername, accessToken);
+    } catch (syncErr: any) {
+      console.warn(`[GitHub OAuth Callback] Installation sync notice: ${syncErr.message}`);
+    }
 
     // If state contains a post-auth redirect target (e.g. setup url), follow it
     if (state && state.startsWith('/')) {
