@@ -3,6 +3,7 @@ from app.workflow.agents.security import SecuritySpecialistAgent, security_agent
 from app.workflow.agents.quality import QualitySpecialistAgent, quality_agent
 from app.workflow.agents.tests import TestsSpecialistAgent, tests_agent
 from app.workflow.agents.docs import DocsSpecialistAgent, docs_agent
+from app.workflow.agents.summary import SummaryAgent, summary_agent
 
 __all__ = [
     "BaseSpecialistAgent",
@@ -14,4 +15,6 @@ __all__ = [
     "tests_agent",
     "DocsSpecialistAgent",
     "docs_agent",
+    "SummaryAgent",
+    "summary_agent",
 ]

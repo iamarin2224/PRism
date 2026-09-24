@@ -91,6 +91,7 @@ class SourceReference(BaseModel):
     end_line: int
     symbol: Optional[str] = None
     similarity: float
+    content: Optional[str] = None
 
 
 class QAResponse(BaseModel):

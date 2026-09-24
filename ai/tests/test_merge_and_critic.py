@@ -146,7 +146,8 @@ def test_post_review_markdown_formatting():
         routing_decision="POST_GITHUB",
     )
 
-    assert "### PRism Automated Code Review (PR #12)" in report
+    assert "PRism Automated Code Intelligence Report" in report
+    assert "`#12`" in report
     assert "[CRITICAL]" in report
     assert "src/db.py" in report
     assert "L25-L30" in report

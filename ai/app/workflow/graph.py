@@ -6,6 +6,7 @@ from app.workflow.state import ReviewState
 from app.workflow.checkpointer import get_default_checkpointer
 from app.workflow.nodes import (
     build_context_node,
+    pr_summary_node,
     security_specialist_node,
     quality_specialist_node,
     tests_specialist_node,
@@ -25,7 +26,8 @@ def create_review_graph(checkpointer: Optional[BaseCheckpointSaver] = None):
     
     Graph Topology:
     START ➔ build_context
-          ├──► security_specialist ──┐
+          ├──► pr_summary          ──┐
+          ├──► security_specialist ──┤
           ├──► quality_specialist  ──┼─► aggregate_and_deduplicate ➔ critic_verifier
           ├──► tests_specialist    ──┤                                     │
           └──► docs_specialist     ──┘                        (conditional gate)
@@ -36,6 +38,7 @@ def create_review_graph(checkpointer: Optional[BaseCheckpointSaver] = None):
 
     # 1. Register all execution nodes
     workflow.add_node("build_context", build_context_node)
+    workflow.add_node("pr_summary", pr_summary_node)
     workflow.add_node("security_specialist", security_specialist_node)
     workflow.add_node("quality_specialist", quality_specialist_node)
     workflow.add_node("tests_specialist", tests_specialist_node)
@@ -49,13 +52,15 @@ def create_review_graph(checkpointer: Optional[BaseCheckpointSaver] = None):
     # 2. Add structural flow edges
     workflow.add_edge(START, "build_context")
 
-    # Parallel specialist fan-out from build_context
+    # Parallel specialist and summary fan-out from build_context
+    workflow.add_edge("build_context", "pr_summary")
     workflow.add_edge("build_context", "security_specialist")
     workflow.add_edge("build_context", "quality_specialist")
     workflow.add_edge("build_context", "tests_specialist")
     workflow.add_edge("build_context", "docs_specialist")
 
     # Fan-in synchronization to aggregate_and_deduplicate
+    workflow.add_edge("pr_summary", "aggregate_and_deduplicate")
     workflow.add_edge("security_specialist", "aggregate_and_deduplicate")
     workflow.add_edge("quality_specialist", "aggregate_and_deduplicate")
     workflow.add_edge("tests_specialist", "aggregate_and_deduplicate")

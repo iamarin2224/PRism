@@ -176,6 +176,139 @@ export async function getInstallationAccessToken(
   };
 }
 
+export interface ReviewCommentPayload {
+  path: string;
+  line?: number;
+  body: string;
+}
+
+/**
+ * Posts a Pull Request review and comments directly to GitHub using the App Installation token.
+ */
+export async function postPullRequestReview(
+  repoFullName: string,
+  prNumber: number,
+  reviewMarkdown: string,
+  comments?: ReviewCommentPayload[],
+  event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'
+): Promise<any> {
+  const { prisma } = await import('@/lib/prisma');
+  const repo = await prisma.repository.findUnique({
+    where: { fullName: repoFullName },
+  });
+
+  let resolvedInstallationId = repo?.installationId;
+
+  // Dynamic installation lookup if missing in DB
+  if (!resolvedInstallationId) {
+    try {
+      const jwt = generateAppJwt();
+      const res = await fetch(`https://api.github.com/repos/${repoFullName}/installation`, {
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'PRism-App',
+        },
+      });
+      if (res.ok) {
+        const instData = await res.json();
+        if (instData && instData.id) {
+          resolvedInstallationId = BigInt(instData.id);
+          // Update DB record
+          if (repo) {
+            await prisma.repository.update({
+              where: { id: repo.id },
+              data: { installationId: resolvedInstallationId },
+            });
+          }
+        }
+      }
+    } catch (findErr: any) {
+      console.warn(`[GitHub Review] Failed dynamic installation lookup for ${repoFullName}: ${findErr.message}`);
+    }
+  }
+
+  if (!resolvedInstallationId) {
+    throw new Error(`Repository '${repoFullName}' is not linked to an active GitHub App installation.`);
+  }
+
+  const { token } = await getInstallationAccessToken(resolvedInstallationId);
+
+  // Filter valid comments with path and line number
+  const validComments = (comments || [])
+    .filter((c) => Boolean(c.path && c.line && c.line > 0))
+    .map((c) => ({
+      path: c.path,
+      line: Number(c.line),
+      body: c.body,
+    }));
+
+  const reviewPayload: any = {
+    body: reviewMarkdown,
+    event: event || 'COMMENT',
+  };
+
+  if (validComments.length > 0) {
+    reviewPayload.comments = validComments;
+  }
+
+  // 1. Attempt official GitHub PR Review API (summary + inline line comments)
+  try {
+    const reviewRes = await fetch(
+      `https://api.github.com/repos/${repoFullName}/pulls/${prNumber}/reviews`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'PRism-App',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reviewPayload),
+      }
+    );
+
+    if (reviewRes.ok) {
+      const data = await reviewRes.json();
+      console.log(`[GitHub Review] Successfully posted PR #${prNumber} review on ${repoFullName}`);
+      return { success: true, type: 'review', data };
+    }
+
+    const errText = await reviewRes.text();
+    console.warn(
+      `[GitHub Review] Review post returned ${reviewRes.status}: ${errText}. Attempting fallback issue comment...`
+    );
+  } catch (revPostErr: any) {
+    console.warn(`[GitHub Review] Review API request failed: ${revPostErr.message}. Attempting fallback issue comment...`);
+  }
+
+  // 2. Fallback: Post overall review body as PR comment (guarantees comment appears even if line positions differ)
+  const fallbackRes = await fetch(
+    `https://api.github.com/repos/${repoFullName}/issues/${prNumber}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'PRism-App',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body: reviewMarkdown }),
+    }
+  );
+
+  if (!fallbackRes.ok) {
+    const fallbackErr = await fallbackRes.text();
+    throw new Error(
+      `Failed to post review comment to GitHub PR #${prNumber} (${fallbackRes.status}): ${fallbackErr}`
+    );
+  }
+
+  const fallbackData = await fallbackRes.json();
+  console.log(`[GitHub Review] Posted fallback issue comment on ${repoFullName} PR #${prNumber}`);
+  return { success: true, type: 'comment', data: fallbackData };
+}
+
 /**
  * Discovers repositories accessible under a GitHub App installation.
  */

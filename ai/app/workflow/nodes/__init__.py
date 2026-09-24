@@ -1,5 +1,6 @@
 from app.workflow.nodes.context import build_context_node
 from app.workflow.nodes.specialists import (
+    pr_summary_node,
     security_specialist_node,
     quality_specialist_node,
     tests_specialist_node,
@@ -18,6 +19,7 @@ from app.workflow.nodes.actions import (
 
 __all__ = [
     "build_context_node",
+    "pr_summary_node",
     "security_specialist_node",
     "quality_specialist_node",
     "tests_specialist_node",

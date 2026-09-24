@@ -5,12 +5,46 @@ from app.workflow.agents import (
     docs_agent,
     quality_agent,
     security_agent,
+    summary_agent,
     tests_agent,
 )
 from app.workflow.events import cost_calculator, events_spine
 from app.workflow.state import ReviewState
 
 logger = logging.getLogger("prism.workflow.nodes.specialists")
+
+
+async def pr_summary_node(state: ReviewState) -> Dict[str, Any]:
+    """
+    PR Summary Agent Node:
+    Synthesizes overall PR intent, file change breakdown, and architectural impact using Mid model.
+    """
+    logger.info(f"[{state['review_run_id']}] PR summary agent executing...")
+    summary_data = await summary_agent.generate_pr_summary(state)
+    tokens_in = summary_data.get("_tokens_in", 0)
+    tokens_out = summary_data.get("_tokens_out", 0)
+    duration_ms = summary_data.get("_duration_ms", 0.0)
+
+    cost_inr = cost_calculator.calculate_cost_inr(
+        model_name=settings.MID_MODEL,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+    )
+
+    clean_summary = {k: v for k, v in summary_data.items() if not k.startswith("_")}
+
+    await events_spine.emit_event(
+        review_run_id=state["review_run_id"],
+        node_name="agent_summary",
+        event_type="PR_SUMMARY_GENERATED",
+        payload=clean_summary,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        cost_inr=cost_inr,
+        duration_ms=duration_ms,
+    )
+
+    return {"pr_summary": clean_summary}
 
 
 async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
@@ -31,7 +65,11 @@ async def security_specialist_node(state: ReviewState) -> Dict[str, Any]:
         review_run_id=state["review_run_id"],
         node_name="specialist_security",
         event_type="SPECIALIST_COMPLETED",
-        payload={"findings_count": len(output.findings), "error": output.error},
+        payload={
+            "findings_count": len(output.findings),
+            "verdict_summary": output.verdict_summary,
+            "error": output.error,
+        },
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
         cost_inr=cost_inr,
@@ -59,7 +97,11 @@ async def quality_specialist_node(state: ReviewState) -> Dict[str, Any]:
         review_run_id=state["review_run_id"],
         node_name="specialist_quality",
         event_type="SPECIALIST_COMPLETED",
-        payload={"findings_count": len(output.findings), "error": output.error},
+        payload={
+            "findings_count": len(output.findings),
+            "verdict_summary": output.verdict_summary,
+            "error": output.error,
+        },
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
         cost_inr=cost_inr,
@@ -87,7 +129,11 @@ async def tests_specialist_node(state: ReviewState) -> Dict[str, Any]:
         review_run_id=state["review_run_id"],
         node_name="specialist_tests",
         event_type="SPECIALIST_COMPLETED",
-        payload={"findings_count": len(output.findings), "error": output.error},
+        payload={
+            "findings_count": len(output.findings),
+            "verdict_summary": output.verdict_summary,
+            "error": output.error,
+        },
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
         cost_inr=cost_inr,
@@ -111,12 +157,15 @@ async def docs_specialist_node(state: ReviewState) -> Dict[str, Any]:
         tokens_out=output.tokens_out,
     )
 
-
     await events_spine.emit_event(
         review_run_id=state["review_run_id"],
         node_name="specialist_docs",
         event_type="SPECIALIST_COMPLETED",
-        payload={"findings_count": len(output.findings), "error": output.error},
+        payload={
+            "findings_count": len(output.findings),
+            "verdict_summary": output.verdict_summary,
+            "error": output.error,
+        },
         tokens_in=output.tokens_in,
         tokens_out=output.tokens_out,
         cost_inr=cost_inr,

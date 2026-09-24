@@ -9,6 +9,7 @@ from app.models.review import Finding
 class SpecialistOutput(BaseModel):
     """Execution output from a single parallel specialist agent."""
     specialist_name: str = Field(..., description="Specialist identifier (e.g. security, quality, tests, docs)")
+    verdict_summary: Optional[str] = Field(default=None, description="Specialized, code-specific verdict summary for this domain")
     findings: List[Finding] = Field(default_factory=list, description="Findings detected by the specialist")
     tokens_in: int = Field(default=0, description="Prompt tokens consumed")
     tokens_out: int = Field(default=0, description="Completion tokens consumed")
@@ -42,6 +43,7 @@ class ReviewState(TypedDict):
     verified_findings: List[Finding]
     routing_decision: Optional[str]  # "POST_GITHUB", "REQUIRE_HUMAN_APPROVAL", "DISMISSED"
     status: str                      # "QUEUED", "IN_PROGRESS", "COMPLETED", "FAILED", "AWAITING_HUMAN_APPROVAL"
+    pr_summary: Optional[Dict[str, Any]]
     total_tokens_in: int
     total_tokens_out: int
     total_cost_inr: float
@@ -75,6 +77,7 @@ def create_initial_review_state(
         "verified_findings": [],
         "routing_decision": None,
         "status": "QUEUED",
+        "pr_summary": None,
         "total_tokens_in": 0,
         "total_tokens_out": 0,
         "total_cost_inr": 0.0,

@@ -9,7 +9,7 @@ from app.config import settings
 logger = logging.getLogger("prism.services.model_router")
 
 ModelTier = Literal["high", "mid", "free"]
-SpecialistRole = Literal["security", "quality", "tests", "docs", "critic"]
+SpecialistRole = Literal["security", "quality", "tests", "docs", "critic", "summary"]
 
 
 class ModelRouter:
@@ -19,7 +19,7 @@ class ModelRouter:
     and model identifier based on the operational tier and specialist role.
 
     - High Tier (HIGH_MODEL): Used by Security specialist and Critic/Verifier node.
-    - Mid Tier (MID_MODEL): Used by Quality and Tests specialists.
+    - Mid Tier (MID_MODEL): Used by Quality, Tests, and PR Summary specialists.
     - Free Tier (OPENROUTER_MODEL): Used by Docs specialist.
 
     Dynamic Fallback Mechanics:
@@ -68,7 +68,7 @@ class ModelRouter:
     def get_tier_for_role(role: SpecialistRole) -> ModelTier:
         if role in ("security", "critic"):
             return "high"
-        elif role in ("quality", "tests"):
+        elif role in ("quality", "tests", "summary"):
             return "mid"
         elif role == "docs":
             return "free"
