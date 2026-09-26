@@ -65,41 +65,41 @@ GitHub Webhook ──► [FastAPI 202 Ingress + Redis Lock] ──► [ARQ Backg
                                                    • Procedural Memory (.prism/rules.yml)
                                                    • Episodic Memory (Historical Feedback)
                                                                │
-         ┌──────────────────────────────┬──────────────────────┼──────────────────────────────┐
-         │                              │                      │                              │
-         ▼                              ▼                      ▼                              ▼
- [Security Agent]               [Quality Agent]          [Tests Agent]                  [Docs Agent]
-DeepSeek V4.1 Flash             Qwen3 Coder 30B         Qwen3 Coder 30B               OpenRouter Free
-(OWASP, Auth, Secrets)       (Design, Anti-Patterns)  (Coverage, Regressions)        (Contracts, Docs)
-         │                              │                      │                              │
-         └──────────────────────────────┴──────────────────────┼──────────────────────────────┘
-                                                               │ (Fan-In Join)
-                                                               ▼
-                                                [2. PR Summary & Merge Node]
-                                                • Line overlap & path deduplication
-                                                • Cross-specialist agreement scoring
-                                                • Executive PR intent & impact analysis
-                                                               │
-                                                               ▼
-                                                [3. Critic / Verifier Node]
-                                                • DeepSeek V4.1 Flash anti-hallucination
-                                                • Exact code snippet grounding check
-                                                               │
-                                                               ▼
-                                                [4. Decision Gate]
-                                               /                  \
-                    (High Conf & No Critical) /                    \ (Low Conf OR Critical Finding)
-                                             ▼                      ▼
-                                     [Post to GitHub]     [Human Approval Queue]
-                                     • Summary Comment              │
-                                     • Line-level Diffs             ▼
-                                     • Check Run Status   [Developer Dashboard]
+        ┌───────────────────┬───────────────────┼───────────────────┬───────────────────┐
+        │                   │                   │                   │                   │
+        ▼                   ▼                   ▼                   ▼                   ▼
+[Security Agent]    [Quality Agent]       [Tests Agent]       [Docs Agent]      [PR Summary Agent]
+DeepSeek V4.1 Flash Qwen3 Coder 30B     Qwen3 Coder 30B     OpenRouter Free     Qwen3 Coder 30B
+(OWASP, Secrets)    (Smells, Design)    (Coverage, Sandbox) (Docs, Contracts)   (Intent & Risk Matrix)
+        │                   │                   │                   │                   │
+        └───────────────────┴───────────────────┼───────────────────┴───────────────────┘
+                                                │ (Fan-In Join)
+                                                ▼
+                                   [2. Deterministic Merge Node]
+                                   • Line overlap & path deduplication
+                                   • Cross-specialist agreement scoring
+                                   • Attach executive summary payload
+                                                │
+                                                ▼
+                                   [3. Critic / Verifier Node]
+                                   • DeepSeek V4.1 Flash anti-hallucination
+                                   • Exact code snippet grounding check (Findings only)
+                                                │
+                                                ▼
+                                   [4. Decision Gate]
+                                  /                  \
+       (High Conf & No Critical) /                    \ (Low Conf OR Critical Finding)
+                                ▼                      ▼
+                        [Post to GitHub]     [Human Approval Queue]
+                        • Summary Comment              │
+                        • Line-level Diffs             ▼
+                        • Check Run Status   [Developer Dashboard]
 ```
 
 - **Tri-Partite Context Grounding:** Before specialists inspect the diff, the context node compiles **Semantic Context** (related codebase symbols outside the diff), **Procedural Rules** (`.prism/rules.yml` and team standards), and **Episodic Memory** (past accepted/dismissed review decisions).
-- **Domain Specialists:** Parallel inspection across Security (OWASP Top 10, injections, hardcoded secrets), Code Quality (architectural smells, dead code, performance bottlenecks), Test Coverage (regression risk, dynamic sandbox execution), and Documentation (API contracts, docstrings).
-- **Summary & Synthesis Agent:** Synthesizes multi-agent findings into an executive PR summary, classifying intent, impact matrix, and code-specific verdict (`APPROVE`, `COMMENT`, `REQUEST_CHANGES`).
-- **Critic Verification Node:** High-reasoning model cross-examines every merged finding against the raw source code chunk to eliminate hallucinations and calibrate confidence scores.
+- **Domain Specialists & Summary Agent (Parallel Fan-Out):** Concurrently dispatches 5 specialized agents. Four inspect the diff for domain-specific flaws (Security, Code Quality, Test Coverage with E2B sandbox execution, and Documentation). In parallel, the **PR Summary Agent** inspects raw PR metadata and diffs independently to produce an executive intent summary, file-impact matrix, and overall risk level.
+- **Deterministic Merge Node:** Fan-in join that deduplicates overlapping line findings across specialists, calculates multi-agent agreement scores, and attaches the independent PR summary to the state.
+- **Critic Verification Node:** High-reasoning model cross-examines candidate code findings against raw source code snippets to eliminate hallucinations and calibrate confidence scores (it does not audit the narrative PR summary).
 - **Human Gate & Resilient Posting:** High-confidence reviews auto-publish structured reports and line-level comments to GitHub; critical or low-confidence findings route to the Human Approval Queue.
 
 ---
@@ -327,9 +327,3 @@ cd ai && ./.venv/bin/pytest tests/ -v
 # 4. Run Live E2B Cloud Sandbox Smoke Test
 cd ai && ./.venv/bin/python sandbox/multi_lang_smoke_test.py
 ```
-
----
-
-## License
-
-PRism is licensed under the [Apache-2.0 License](LICENSE).

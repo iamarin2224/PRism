@@ -122,28 +122,30 @@ flowchart TD
         NodeContext -->|Episodic Memory| Epi[(Episodic: Human Feedback DB)]
     end
 
-    subgraph FanOut ["4. Parallel Specialist Fan-Out"]
+    subgraph FanOut ["4. Parallel Specialist & Summary Fan-Out"]
         NodeContext --> Fork{Fan-Out}
         Fork -->|DeepSeek V4.1 Flash| Sec[Security Specialist]
         Fork -->|Qwen3 Coder 30B| Qual[Quality Specialist]
         Fork -->|Qwen3 Coder 30B| Test[Tests Specialist]
         Fork -->|OpenRouter Free| Docs[Docs Specialist]
+        Fork -->|Qwen3 Coder 30B| Sum[PR Summary Agent]
 
         Sec -.->|Tools & Sandbox| Tools[(14 Agent Tools + E2B)]
         Qual -.->|Tools & Sandbox| Tools
         Test -.->|Tools & Sandbox| Tools
         Docs -.->|Tools & Sandbox| Tools
+        Sum -.->|PR Diff & Metadata| Diff[PR Title, Body & Diff Content]
     end
 
-    subgraph AggregationCritic ["5. Aggregation & Synthesis"]
+    subgraph AggregationCritic ["5. Aggregation & Verification"]
         Sec --> Join{Fan-In Join}
         Qual --> Join
         Test --> Join
         Docs --> Join
+        Sum --> Join
 
         Join --> NodeMerge[Deterministic Merge Node\nLine overlap deduplication & agreement]
-        NodeMerge --> NodeSummary[PR Summary Agent\nIntent Analysis & Impact Matrix]
-        NodeSummary --> NodeCritic[Critic / Verifier Node\nDeepSeek V4.1 Flash Grounding Check]
+        NodeMerge --> NodeCritic[Critic / Verifier Node\nDeepSeek V4.1 Flash Grounding Check on Findings]
     end
 
     subgraph DecisionGate ["6. Decision Gate & Actions"]
@@ -174,17 +176,17 @@ Before any specialist executes, the context node gathers:
 ### 3. Tiered Model Routing & Parallel Specialists (`app/workflow/agents/` & `services/model_router.py`)
 Agents run concurrently with tiered models and automatic fallback to free tiers on credit exhaustion:
 
-| Specialist / Agent | Default Model Tier | Primary Focus | Tools Used |
+| Specialist / Agent | Default Model Tier | Primary Focus | Context / Inputs |
 | :--- | :--- | :--- | :--- |
-| **Security Agent** | `deepseek/deepseek-v4.1-flash` | OWASP Top 10, auth flaws, injection, secret leaks | `read_file`, `search_codebase`, `fetch_webpage` |
-| **Quality Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Code architecture, anti-patterns, performance, dead code | `read_file`, `find_references`, `get_blame` |
-| **Tests Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Regression risks, test coverage, sandbox verification | `read_file`, `get_related_tests`, `run_tests`, `run_linter` |
-| **Docs Agent** | `openrouter/free` | API contracts, docstrings, breaking changes | `read_file`, `get_pr_diff`, `web_search` |
-| **PR Summary Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Intent analysis, impact matrix, verdict synthesis | Synthesizes specialist outputs |
-| **Critic / Verifier** | `deepseek/deepseek-v4.1-flash` | Grounding check against raw source, anti-hallucination | `read_file`, `search_codebase` |
+| **Security Agent** | `deepseek/deepseek-v4.1-flash` | OWASP Top 10, auth flaws, injection, secret leaks | RAG Context, Diff, Tools (`read_file`, `search_codebase`) |
+| **Quality Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Code architecture, anti-patterns, performance, dead code | RAG Context, Diff, Tools (`read_file`, `find_references`) |
+| **Tests Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Regression risks, test coverage, sandbox verification | RAG Context, Diff, Tools (`run_tests`, `run_linter`) |
+| **Docs Agent** | `openrouter/free` | API contracts, docstrings, breaking changes | RAG Context, Diff, Tools (`read_file`, `web_search`) |
+| **PR Summary Agent** | `qwen/qwen3-coder-30b-a3b-instruct` | Intent analysis, file-by-file impact table, risk assessment | Independent analysis of PR Title, Body, and Diff Content |
+| **Critic / Verifier** | `deepseek/deepseek-v4.1-flash` | Grounding check against raw source, anti-hallucination | Audits candidate findings against raw code snippet |
 
-### 4. PR Summary Synthesis & Resilient Publishing (`app/workflow/agents/summary.py` & `nodes/post.py`)
-- **Summary Synthesis:** Synthesizes findings into high-level executive summaries, breaking down change categories (`Feature`, `Fix`, `Refactor`, `Chore`), risk factors, and calibrated verdicts (`APPROVE`, `COMMENT`, `REQUEST_CHANGES`).
+### 4. PR Summary & Resilient Publishing (`app/workflow/agents/summary.py` & `nodes/post.py`)
+- **Independent Summary Generation:** The Summary Agent runs in parallel alongside the 4 specialists. It independently analyzes the PR title, description, and diffs to classify intent (`Feature`, `Fix`, `Refactor`, `Chore`), generate a file-by-file changes breakdown, and assess architectural risk without relying on specialist outputs.
 - **Resilient Multi-Target Posting:** Formats GitHub-flavored markdown with collapsible detail sections, posts root review comments, and falls back to individual PR inline comments when line-level references match the diff.
 
 ---
