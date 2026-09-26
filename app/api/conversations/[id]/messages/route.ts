@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma';
-import { queryRepository } from '@/lib/ai/client';
+import { queryRepositoryStream, queryRepository } from '@/lib/ai/client';
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +16,7 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { content } = body;
+    const { content, stream = true } = body;
 
     if (!content || !content.trim()) {
       return NextResponse.json({ error: 'Message content cannot be empty' }, { status: 400 });
@@ -54,12 +54,10 @@ export async function POST(
       });
     }
 
-    // 3. Query RAG engine for grounded answer
-    let assistantMessage;
-    try {
+    if (!stream) {
+      // Non-streaming fallback
       const ragResult = await queryRepository(conversation.repoName, content.trim(), 5);
-
-      assistantMessage = await prisma.message.create({
+      const assistantMessage = await prisma.message.create({
         data: {
           conversationId: conversation.id,
           role: 'ASSISTANT',
@@ -67,29 +65,129 @@ export async function POST(
           sources: ragResult.sources ? JSON.parse(JSON.stringify(ragResult.sources)) : null,
         },
       });
-    } catch (ragError: any) {
-      console.error(`[RAG Query Error in Conversation ${conversation.id}]:`, ragError);
-      assistantMessage = await prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          role: 'ASSISTANT',
-          content: `Error generating response: ${ragError.message || 'Failed to retrieve code context or connect to AI service.'}`,
-        },
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date() },
       });
+      return NextResponse.json({ userMessage, assistantMessage });
     }
 
-    // Update conversation updatedAt timestamp
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
+    // 3. Streaming response pipeline
+    const aiResponse = await queryRepositoryStream(conversation.repoName, content.trim(), 5);
+    if (!aiResponse.body) {
+      throw new Error('AI service did not return a stream body');
+    }
+
+    const reader = aiResponse.body.getReader();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    let accumulatedAnswer = '';
+    let sources: any = null;
+
+    const readable = new ReadableStream({
+      async start(controller) {
+        // Send initial user message event
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'user_message', message: userMessage })}\n\n`)
+        );
+
+        let buffer = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value, { stream: true });
+            buffer += text;
+
+            // Process SSE lines
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const eventData = JSON.parse(trimmed.slice(6));
+                  if (eventData.type === 'sources') {
+                    sources = eventData.sources;
+                  } else if (eventData.type === 'delta') {
+                    accumulatedAnswer += eventData.content;
+                  } else if (eventData.type === 'done') {
+                    if (eventData.full_answer) {
+                      accumulatedAnswer = eventData.full_answer;
+                    }
+                  }
+                } catch {
+                  // Ignore JSON parse error on partial chunks
+                }
+              }
+              controller.enqueue(encoder.encode(`${line}\n\n`));
+            }
+          }
+
+          // Handle any remaining text in buffer
+          if (buffer.trim().startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(buffer.trim().slice(6));
+              if (eventData.type === 'delta') accumulatedAnswer += eventData.content;
+              if (eventData.type === 'sources') sources = eventData.sources;
+            } catch {}
+            controller.enqueue(encoder.encode(`${buffer}\n\n`));
+          }
+
+          // 4. Save completed assistant message to Prisma
+          const assistantMessage = await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              role: 'ASSISTANT',
+              content: accumulatedAnswer.trim() || 'No answer generated.',
+              sources: sources ? JSON.parse(JSON.stringify(sources)) : null,
+            },
+          });
+
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { updatedAt: new Date() },
+          });
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'saved',
+                userMessage,
+                assistantMessage,
+              })}\n\n`
+            )
+          );
+        } catch (streamErr: any) {
+          console.error('[Streaming error]:', streamErr);
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'error',
+                error: streamErr.message || 'Stream processing failed',
+              })}\n\n`
+            )
+          );
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    return NextResponse.json({
-      userMessage,
-      assistantMessage,
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
     });
   } catch (err: any) {
     console.error(`[Post Message] Error: ${err.message}`);
     return NextResponse.json({ error: 'Failed to post message' }, { status: 500 });
   }
 }
+

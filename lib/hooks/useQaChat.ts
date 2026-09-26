@@ -147,7 +147,7 @@ export function useCreateConversation() {
   });
 }
 
-// 5. Send Message Mutation with Optimistic Updates
+// 5. Send Message Mutation with Optimistic Updates (Standard)
 export function useSendMessage() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -162,7 +162,7 @@ export function useSendMessage() {
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, stream: false }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -199,7 +199,6 @@ export function useSendMessage() {
     onSuccess: (data, variables) => {
       queryClient.setQueryData<ConversationDetail>(['conversation', variables.conversationId], (old) => {
         if (!old) return old;
-        // Replace temp optimistic message with actual userMessage and assistantMessage
         const filtered = old.messages.filter((m) => !m.id.startsWith('temp-'));
         return {
           ...old,
@@ -213,6 +212,7 @@ export function useSendMessage() {
     },
   });
 }
+
 
 // 6. Add/Explore Public Repo Mutation
 export function useAddExploredRepo() {

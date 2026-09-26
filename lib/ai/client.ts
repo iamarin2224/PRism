@@ -224,3 +224,29 @@ export async function queryRepository(repoName: string, query: string, topK: num
   return response.json();
 }
 
+/**
+ * Performs streaming repository Q&A using RAG and Server-Sent Events.
+ */
+export async function queryRepositoryStream(repoName: string, query: string, topK: number = 5): Promise<Response> {
+  const response = await fetch(`${AI_SERVICE_URL}/api/rag/query-stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      repo_name: repoName,
+      query,
+      top_k: topK,
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail || errorData.error || `AI service returned status ${response.status}`
+    );
+  }
+
+  return response;
+}
+
+

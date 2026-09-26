@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/Header';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AddRepositoryModal } from '@/components/AddRepositoryModal';
+import { MarkdownMessage } from '@/components/MarkdownMessage';
 import {
   useUnifiedRepositories,
   useConversations,
@@ -14,6 +16,8 @@ import {
   useDeleteConversation,
   useDeleteExploredRepo,
   RepositoryItem,
+  ChatMessage,
+  ConversationDetail,
 } from '@/lib/hooks/useQaChat';
 
 function CodeQAChatContent() {
@@ -27,8 +31,20 @@ function CodeQAChatContent() {
   const [inputMessage, setInputMessage] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [myReposCollapsed, setMyReposCollapsed] = useState(false);
+  const [exploredReposCollapsed, setExploredReposCollapsed] = useState(false);
+
+  // Streaming state
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<{
+    role: 'ASSISTANT';
+    content: string;
+    sources?: any[];
+  } | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // Queries
   const { data: repoData, isLoading: loadingRepos, refetch: refetchRepos } = useUnifiedRepositories();
@@ -37,7 +53,6 @@ function CodeQAChatContent() {
 
   // Mutations
   const createConvMutation = useCreateConversation();
-  const sendMessageMutation = useSendMessage();
   const deleteConvMutation = useDeleteConversation();
   const deleteExploredMutation = useDeleteExploredRepo();
 
@@ -64,10 +79,10 @@ function CodeQAChatContent() {
     }
   }, [selectedRepo, conversations, activeConversationId]);
 
-  // Scroll to bottom of chat when new message arrives
+  // Scroll to bottom of chat when new message arrives or streams
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [currentConversation?.messages, sendMessageMutation.isPending]);
+  }, [currentConversation?.messages, streamingMessage?.content, isStreaming]);
 
   const handleSelectRepo = (repoFullName: string) => {
     setSelectedRepo(repoFullName);
@@ -87,7 +102,7 @@ function CodeQAChatContent() {
   };
 
   const handleNewConversation = async () => {
-    if (!selectedRepo) return;
+    if (!selectedRepo || isStreaming) return;
     try {
       const newConv = await createConvMutation.mutateAsync({
         repoName: selectedRepo,
@@ -106,7 +121,7 @@ function CodeQAChatContent() {
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const content = inputMessage.trim();
-    if (!content || !selectedRepo) return;
+    if (!content || !selectedRepo || isStreaming) return;
 
     try {
       let targetConvId = activeConversationId;
@@ -119,18 +134,106 @@ function CodeQAChatContent() {
         });
         targetConvId = newConv.id;
         setActiveConversationId(newConv.id);
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('repo', selectedRepo);
+        newUrl.searchParams.set('conversation', newConv.id);
+        router.replace(newUrl.pathname + newUrl.search);
       }
 
       if (!targetConvId) return;
 
       setInputMessage('');
-      await sendMessageMutation.mutateAsync({
+      setIsStreaming(true);
+      setStreamError(null);
+      setStreamingMessage({ role: 'ASSISTANT', content: '', sources: [] });
+
+      // Optimistically append user message to TanStack query cache
+      const prevConv = queryClient.getQueryData<ConversationDetail>(['conversation', targetConvId]);
+      const tempUserMessage: ChatMessage = {
+        id: `temp-user-${Date.now()}`,
         conversationId: targetConvId,
+        role: 'USER',
         content,
-        repoName: selectedRepo,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (prevConv) {
+        queryClient.setQueryData<ConversationDetail>(['conversation', targetConvId], {
+          ...prevConv,
+          messages: [...prevConv.messages, tempUserMessage],
+        });
+      }
+
+      const res = await fetch(`/api/conversations/${targetConvId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, stream: true }),
       });
-    } catch (err) {
-      console.error('Failed to send message:', err);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to post message (${res.status})`);
+      }
+
+      if (!res.body) {
+        throw new Error('No streaming response body available');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(trimmed.slice(6));
+              if (event.type === 'sources') {
+                setStreamingMessage((prev) => ({
+                  role: 'ASSISTANT',
+                  content: prev?.content || '',
+                  sources: event.sources,
+                }));
+              } else if (event.type === 'delta') {
+                setStreamingMessage((prev) => ({
+                  role: 'ASSISTANT',
+                  content: (prev?.content || '') + event.content,
+                  sources: prev?.sources || [],
+                }));
+              } else if (event.type === 'saved') {
+                // Update TanStack query cache with the final persisted messages
+                queryClient.setQueryData<ConversationDetail>(['conversation', targetConvId], (old) => {
+                  if (!old) return old;
+                  const filtered = old.messages.filter((m) => !m.id.startsWith('temp-'));
+                  return {
+                    ...old,
+                    messages: [...filtered, event.userMessage, event.assistantMessage],
+                  };
+                });
+                queryClient.invalidateQueries({ queryKey: ['conversations', selectedRepo] });
+              } else if (event.type === 'error') {
+                setStreamError(event.error);
+              }
+            } catch {
+              // Ignore partial JSON parsing errors
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to stream message:', err);
+      setStreamError(err.message || 'Error occurred while streaming response');
+    } finally {
+      setIsStreaming(false);
+      setStreamingMessage(null);
     }
   };
 
@@ -210,7 +313,7 @@ function CodeQAChatContent() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
               {loadingRepos ? (
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px' }}>Loading repositories...</div>
               ) : allRepos.length === 0 ? (
@@ -225,146 +328,251 @@ function CodeQAChatContent() {
                 </div>
               ) : (
                 <>
-                  {/* My Indexed Repositories */}
+                  {/* My Repositories */}
                   <div>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', opacity: 0.8, marginBottom: '4px', textTransform: 'uppercase' }}>
-                      ├── My Tracked Repositories ({repoData?.myRepos?.length || 0})
+                    <div
+                      onClick={() => setMyReposCollapsed(!myReposCollapsed)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: 'var(--text-muted)',
+                        opacity: 0.85,
+                        marginBottom: '4px',
+                        textTransform: 'uppercase',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        padding: '3px 4px',
+                        borderRadius: '4px',
+                        transition: 'background-color 0.1s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      title="Click to collapse / expand"
+                    >
+                      <span>├── My Repositories ({repoData?.myRepos?.length || 0})</span>
+                      <span style={{ fontSize: '9px', opacity: 0.75 }}>
+                        {myReposCollapsed ? '▶' : '▼'}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
-                      {repoData?.myRepos?.map((r) => {
-                        const isSelected = selectedRepo === r.fullName;
-                        return (
-                          <div
-                            key={r.id}
-                            onClick={() => handleSelectRepo(r.fullName)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
-                              border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
-                              transition: 'all 0.1s ease',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                              <span style={{ fontSize: '13px' }}>⑂</span>
-                              <span
-                                style={{
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? 600 : 400,
-                                  color: isSelected ? '#ffffff' : 'var(--text)',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title={r.fullName}
-                              >
-                                {r.name}
-                              </span>
-                            </div>
-                            <span
+
+                    {!myReposCollapsed && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                        {repoData?.myRepos
+                          ?.filter((r) => r.indexStatus !== 'FAILED')
+                          ?.map((r) => {
+                          const isSelected = selectedRepo === r.fullName;
+                          const isUpToDate = r.indexStatus === 'INDEXED';
+                          const isStale = r.indexStatus === 'STALE';
+                          const isIndexing = r.indexStatus === 'INDEXING';
+
+                          return (
+                            <div
+                              key={r.id}
+                              onClick={() => handleSelectRepo(r.fullName)}
                               style={{
-                                fontSize: '9px',
-                                fontWeight: 600,
-                                padding: '1px 5px',
-                                borderRadius: '3px',
-                                backgroundColor: r.indexStatus === 'INDEXED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                color: r.indexStatus === 'INDEXED' ? '#34d399' : '#fbbf24',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                                border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                                transition: 'all 0.1s ease',
                               }}
                             >
-                              {r.indexStatus}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {(!repoData?.myRepos || repoData.myRepos.length === 0) && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None tracked yet</div>
-                      )}
-                    </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: '13px' }}>⑂</span>
+                                <span
+                                  style={{
+                                    fontSize: '12px',
+                                    fontWeight: isSelected ? 600 : 400,
+                                    color: isSelected ? '#ffffff' : 'var(--text)',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={r.fullName}
+                                >
+                                  {r.name}
+                                </span>
+                              </div>
+
+                              {isUpToDate && (
+                                <span
+                                  style={{
+                                    fontSize: '9px',
+                                    fontWeight: 600,
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#34d399',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                >
+                                  ● Up to date
+                                </span>
+                              )}
+                              {isStale && (
+                                <span
+                                  style={{
+                                    fontSize: '9px',
+                                    fontWeight: 600,
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                                    color: '#fde047',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                >
+                                  ⚠ Needs sync
+                                </span>
+                              )}
+                              {isIndexing && (
+                                <span
+                                  style={{
+                                    fontSize: '9px',
+                                    fontWeight: 600,
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                    color: '#fbbf24',
+                                  }}
+                                >
+                                  ◐ Indexing
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(!repoData?.myRepos || repoData.myRepos.filter((r) => r.indexStatus !== 'FAILED').length === 0) && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None indexed yet</div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Explored Repositories */}
                   <div>
-                    <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', opacity: 0.8, marginBottom: '4px', textTransform: 'uppercase' }}>
-                      └── Explored Repositories ({repoData?.exploredRepos?.length || 0})
+                    <div
+                      onClick={() => setExploredReposCollapsed(!exploredReposCollapsed)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: 'var(--text-muted)',
+                        opacity: 0.85,
+                        marginBottom: '4px',
+                        textTransform: 'uppercase',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        padding: '3px 4px',
+                        borderRadius: '4px',
+                        transition: 'background-color 0.1s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      title="Click to collapse / expand"
+                    >
+                      <span>
+                        └── Explored Repositories (
+                        {repoData?.exploredRepos?.filter((r) => r.indexStatus !== 'FAILED')?.length || 0})
+                      </span>
+                      <span style={{ fontSize: '9px', opacity: 0.75 }}>
+                        {exploredReposCollapsed ? '▶' : '▼'}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
-                      {repoData?.exploredRepos?.map((r) => {
-                        const isSelected = selectedRepo === r.fullName;
-                        return (
-                          <div
-                            key={r.id}
-                            onClick={() => handleSelectRepo(r.fullName)}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
-                              border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
-                              transition: 'all 0.1s ease',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
-                              <span style={{ fontSize: '13px' }}>🌐</span>
-                              <span
-                                style={{
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? 600 : 400,
-                                  color: isSelected ? '#ffffff' : 'var(--text)',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title={r.fullName}
-                              >
-                                {r.fullName}
-                              </span>
-                            </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span
-                                style={{
-                                  fontSize: '9px',
-                                  fontWeight: 600,
-                                  padding: '1px 5px',
-                                  borderRadius: '3px',
-                                  backgroundColor: r.indexStatus === 'INDEXED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                  color: r.indexStatus === 'INDEXED' ? '#34d399' : '#fbbf24',
-                                }}
-                              >
-                                {r.indexStatus}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteExploredMutation.mutate(r.id);
-                                }}
-                                title="Remove explored repo"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: 'var(--text-muted)',
-                                  cursor: 'pointer',
-                                  fontSize: '11px',
-                                  padding: '2px',
-                                }}
-                              >
-                                ✕
-                              </button>
+                    {!exploredReposCollapsed && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                        {repoData?.exploredRepos
+                          ?.filter((r) => r.indexStatus !== 'FAILED')
+                          ?.map((r) => {
+                          const isSelected = selectedRepo === r.fullName;
+                          const isIndexing = r.indexStatus === 'INDEXING';
+                          return (
+                            <div
+                              key={r.id}
+                              onClick={() => handleSelectRepo(r.fullName)}
+                              style={{
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                                border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
+                                transition: 'all 0.1s ease',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
+                                <span style={{ fontSize: '13px' }}>🌐</span>
+                                <span
+                                  style={{
+                                    fontSize: '12px',
+                                    fontWeight: isSelected ? 600 : 400,
+                                    color: isSelected ? '#ffffff' : 'var(--text)',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={r.fullName}
+                                >
+                                  {r.fullName}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {isIndexing && (
+                                  <span
+                                    style={{
+                                      fontSize: '9px',
+                                      fontWeight: 600,
+                                      padding: '1px 5px',
+                                      borderRadius: '3px',
+                                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                      color: '#fbbf24',
+                                    }}
+                                  >
+                                    ◐ Indexing
+                                  </span>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteExploredMutation.mutate(r.id);
+                                  }}
+                                  title="Remove explored repo"
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    padding: '2px',
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                      {(!repoData?.exploredRepos || repoData.exploredRepos.length === 0) && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None explored yet</div>
-                      )}
-                    </div>
+                          );
+                        })}
+                        {(!repoData?.exploredRepos || repoData.exploredRepos.filter((r) => r.indexStatus !== 'FAILED').length === 0) && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 8px' }}>None explored yet</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -512,7 +720,12 @@ function CodeQAChatContent() {
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>TARGET CODEBASE:</span>
                 <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>{selectedRepo || 'No repository selected'}</span>
-                  {activeRepo && <StatusBadge type="index" value={activeRepo.indexStatus} size="sm" />}
+                  {activeRepo && activeRepo.type === 'my_repo' && (
+                    <StatusBadge type="index" value={activeRepo.indexStatus} size="sm" />
+                  )}
+                  {activeRepo && activeRepo.type === 'explored' && activeRepo.indexStatus === 'INDEXING' && (
+                    <StatusBadge type="index" value="INDEXING" size="sm" />
+                  )}
                 </div>
               </div>
             </div>
@@ -677,7 +890,7 @@ function CodeQAChatContent() {
                     </div>
 
                     <div
-                      className={isUser ? 'prism-card' : 'prism-card'}
+                      className="prism-card"
                       style={{
                         maxWidth: '85%',
                         padding: '16px 20px',
@@ -687,10 +900,13 @@ function CodeQAChatContent() {
                         color: isUser ? '#ffffff' : '#f1f5f9',
                         fontSize: '14px',
                         lineHeight: 1.65,
-                        whiteSpace: 'pre-wrap',
                       }}
                     >
-                      {msg.content}
+                      {isUser ? (
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                      ) : (
+                        <MarkdownMessage content={msg.content} />
+                      )}
 
                       {/* Referenced Code Sources */}
                       {msg.sources && msg.sources.length > 0 && (
@@ -759,37 +975,116 @@ function CodeQAChatContent() {
               })
             )}
 
-            {/* Pending Assistant Message */}
-            {sendMessageMutation.isPending && (
+            {/* Live Streaming Assistant Message */}
+            {isStreaming && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px' }}>
-                  ✨ PRism Intelligence
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>✨ PRism Intelligence</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>
+                    Streaming...
+                  </span>
                 </div>
+
                 <div
                   className="prism-card"
                   style={{
-                    padding: '14px 18px',
+                    maxWidth: '85%',
+                    padding: '16px 20px',
                     borderRadius: '12px 12px 12px 2px',
                     backgroundColor: '#0f172a',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    fontSize: '13px',
-                    color: '#94a3b8',
+                    border: '1px solid var(--accent-border)',
+                    boxShadow: '0 0 15px rgba(168, 85, 247, 0.08)',
+                    color: '#f1f5f9',
+                    fontSize: '14px',
+                    lineHeight: 1.65,
                   }}
                 >
-                  <div
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--accent-cyan)',
-                      animation: 'pulse 1.2s infinite',
-                    }}
-                  />
-                  <span>Searching vector embeddings and synthesizing answer...</span>
+                  {streamingMessage?.content ? (
+                    <div>
+                      <MarkdownMessage content={streamingMessage.content} />
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: '6px',
+                          height: '14px',
+                          backgroundColor: 'var(--accent-cyan)',
+                          marginLeft: '4px',
+                          verticalAlign: 'middle',
+                          animation: 'pulse 1s infinite',
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#94a3b8', fontSize: '13px' }}>
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--accent-cyan)',
+                          animation: 'pulse 1.2s infinite',
+                        }}
+                      />
+                      <span>Searching vector embeddings and synthesizing answer...</span>
+                    </div>
+                  )}
+
+                  {/* Live Sources as they arrive */}
+                  {streamingMessage?.sources && streamingMessage.sources.length > 0 && (
+                    <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: 'var(--text-muted)',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        Referenced Code Sources ({streamingMessage.sources.length})
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {streamingMessage.sources.map((src, sIdx) => (
+                          <div
+                            key={sIdx}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--code-bg)',
+                              border: '1px solid var(--border)',
+                              fontSize: '12px',
+                              fontFamily: 'var(--mono)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>📄 {src.file_path}</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                                Lines {src.start_line}–{src.end_line}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* Streaming Error Banner */}
+            {streamError && (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '8px',
+                  color: '#f87171',
+                  fontSize: '13px',
+                }}
+              >
+                ✕ {streamError}
               </div>
             )}
 
@@ -812,10 +1107,12 @@ function CodeQAChatContent() {
                 onKeyDown={handleKeyDown}
                 placeholder={
                   selectedRepo
-                    ? `Ask anything about ${selectedRepo}... (Enter to send, Shift+Enter for newline)`
+                    ? isStreaming
+                      ? 'Generating response...'
+                      : `Ask anything about ${selectedRepo}... (Enter to send, Shift+Enter for newline)`
                     : 'Select a repository above first...'
                 }
-                disabled={!selectedRepo || sendMessageMutation.isPending}
+                disabled={!selectedRepo || isStreaming}
                 style={{
                   flex: 1,
                   padding: '10px 14px',
@@ -828,16 +1125,17 @@ function CodeQAChatContent() {
                   outline: 'none',
                   resize: 'none',
                   fontFamily: 'inherit',
+                  opacity: isStreaming ? 0.7 : 1,
                 }}
               />
 
               <button
                 type="submit"
-                disabled={!selectedRepo || !inputMessage.trim() || sendMessageMutation.isPending}
+                disabled={!selectedRepo || !inputMessage.trim() || isStreaming}
                 className="prism-btn prism-btn-primary"
                 style={{ padding: '10px 20px', fontSize: '13px', height: '44px', flexShrink: 0 }}
               >
-                {sendMessageMutation.isPending ? 'Searching...' : 'Send →'}
+                {isStreaming ? 'Streaming...' : 'Send →'}
               </button>
             </form>
           </div>

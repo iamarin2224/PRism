@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -357,4 +358,28 @@ async def ask_repository_question(payload: QARequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Repository Q&A failed: {str(e)}",
         )
+
+
+@app.post("/api/rag/query-stream")
+async def ask_repository_question_stream(payload: QARequest):
+    """
+    Streaming Repository Q&A:
+    Streams real-time tokens and retrieved source citations using Server-Sent Events (SSE).
+    """
+    try:
+        return StreamingResponse(
+            qa_service.stream_question(payload),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Streaming Repository Q&A failed: {str(e)}",
+        )
+
 

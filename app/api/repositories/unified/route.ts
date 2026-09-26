@@ -20,14 +20,14 @@ export async function GET() {
     const myRepos = await prisma.repository.findMany({
       where: {
         installationId: { in: installIds },
-        isTracked: true,
+        indexStatus: { in: ['INDEXED', 'INDEXING', 'STALE'] },
       },
       include: {
         _count: {
           select: { reviewRuns: true, conversations: { where: { userId: user.id } } },
         },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ isTracked: 'desc' }, { updatedAt: 'desc' }],
     });
 
     // 2. Fetch user's explored repositories (public repositories user has explored)
@@ -65,7 +65,7 @@ export async function GET() {
     }));
 
     const serializedExploredRepos = userExplored
-      .filter((ue) => ue.repository)
+      .filter((ue) => ue.repository && ue.repository.indexStatus !== 'FAILED')
       .map((ue) => {
         const r = ue.repository;
         return {
