@@ -32,7 +32,7 @@ export default function RepositoryDetailPage({
 
   if (isLoading && !repository) {
     return (
-      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
         Loading repository information...
       </div>
     );
@@ -40,15 +40,16 @@ export default function RepositoryDetailPage({
 
   if (error || !repository) {
     return (
-      <div style={{ padding: '40px 32px' }}>
+      <div style={{ padding: '32px' }}>
         <div
           style={{
-            padding: '16px',
+            padding: '14px 18px',
             borderRadius: '6px',
             backgroundColor: 'var(--status-red-bg)',
             border: '1px solid var(--status-red-border)',
             color: 'var(--status-red)',
             marginBottom: '16px',
+            fontSize: '13px',
           }}
         >
           {error || 'Repository not found'}
@@ -72,36 +73,34 @@ export default function RepositoryDetailPage({
         ]}
         actions={
           <div style={{ display: 'flex', gap: '8px' }}>
+            <Link
+              href={`/qa?repo=${encodeURIComponent(repository.fullName)}`}
+              className="prism-btn prism-btn-primary prism-btn-sm"
+            >
+              💬 Ask Code Q&A →
+            </Link>
             <button
               onClick={handleReindex}
               disabled={reindexMutation.isPending || repository.indexStatus === 'INDEXING'}
-              className="prism-btn prism-btn-primary"
-              style={{ fontSize: '12px' }}
+              className="prism-btn prism-btn-secondary prism-btn-sm"
             >
-              {repository.indexStatus === 'INDEXING' || reindexMutation.isPending ? '⏳ Indexing in Background...' : '↻ Reindex'}
+              {repository.indexStatus === 'INDEXING' || reindexMutation.isPending ? '⏳ Indexing...' : '↻ Reindex'}
             </button>
-            <Link
-              href={`/qa?repo=${encodeURIComponent(repository.fullName)}`}
-              className="prism-btn prism-btn-secondary"
-              style={{ fontSize: '12px' }}
-            >
-              Ask Code Q&A →
-            </Link>
           </div>
         }
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Repo Metadata Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               INDEXING STATUS
             </span>
-            <div style={{ marginTop: '4px' }}>
+            <div style={{ marginTop: '2px' }}>
               <StatusBadge type="index" value={repository.indexStatus} size="md" />
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               {repository.indexStatus === 'INDEXED'
                 ? 'Semantic index ready'
                 : repository.indexStatus === 'INDEXING'
@@ -112,42 +111,42 @@ export default function RepositoryDetailPage({
             </div>
           </div>
 
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               DEFAULT BRANCH
             </span>
-            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-h)' }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-h)', fontFamily: 'var(--mono)', marginTop: '2px' }}>
               {repository.defaultBranch || 'main'}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Target branch for reviews
             </div>
           </div>
 
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               INDEXED COMMIT
             </span>
-            <div style={{ fontSize: '14px', fontFamily: 'var(--mono)', color: 'var(--accent-cyan)' }}>
+            <div style={{ fontSize: '13px', fontFamily: 'var(--mono)', color: 'var(--accent-cyan)', marginTop: '2px' }}>
               {repository.indexedCommit ? repository.indexedCommit.substring(0, 10) : 'None'}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Current SHA in vector index
             </div>
           </div>
 
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               LAST INDEXED AT
             </span>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-h)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-h)', marginTop: '2px' }}>
               {repository.lastIndexedAt
                 ? new Date(repository.lastIndexedAt).toLocaleDateString() +
                   ' ' +
-                  new Date(repository.lastIndexedAt).toLocaleTimeString()
+                  new Date(repository.lastIndexedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : 'Never'}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Latest embedding sync
             </div>
           </div>
@@ -171,17 +170,17 @@ export default function RepositoryDetailPage({
 
         {/* Recent Reviews for this Repository */}
         <div className="prism-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-h)' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+            <h3 style={{ margin: 0, fontSize: '14.5px', color: 'var(--text-h)' }}>
               Recent Reviews ({reviews.length})
             </h3>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
               Pull requests reviewed by PRism agents for {repository.fullName}
             </div>
           </div>
 
           {reviews.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
               No reviews have been triggered for this repository yet. When a pull request is opened on GitHub, PRism will automatically analyze the diff.
             </div>
           ) : (
@@ -214,7 +213,9 @@ export default function RepositoryDetailPage({
                       </Link>
                     </td>
                     <td>
-                      <code style={{ fontSize: '11px' }}>{rev.commitSha.substring(0, 7)}</code>
+                      <code style={{ fontSize: '11.5px', color: 'var(--text)' }}>
+                        {rev.commitSha?.substring(0, 7) || '—'}
+                      </code>
                     </td>
                     <td>
                       <StatusBadge type="review" value={rev.status} />
@@ -235,14 +236,13 @@ export default function RepositoryDetailPage({
                     <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       {rev.durationMs ? `${(rev.durationMs / 1000).toFixed(1)}s` : '—'}
                     </td>
-                    <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <td style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {new Date(rev.createdAt).toLocaleDateString()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <Link
                         href={`/reviews/${rev.id}`}
-                        className="prism-btn prism-btn-secondary"
-                        style={{ fontSize: '11px', padding: '4px 10px' }}
+                        className="prism-btn prism-btn-secondary prism-btn-sm"
                       >
                         View Report →
                       </Link>

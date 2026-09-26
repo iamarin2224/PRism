@@ -108,7 +108,7 @@ export default function RepositoriesPage() {
         actions={
           <button
             onClick={handleRefreshAll}
-            className="prism-btn prism-btn-secondary"
+            className="prism-btn prism-btn-secondary prism-btn-sm"
             title="Refresh repository status"
           >
             ↻ Refresh
@@ -116,7 +116,7 @@ export default function RepositoriesPage() {
         }
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {!hasInstallation && <ConnectGitHubBanner />}
 
         {error && (
@@ -135,20 +135,28 @@ export default function RepositoriesPage() {
         )}
 
         {/* Tab Controls & Search Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '3px',
+              borderRadius: '7px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+            }}
+          >
             <button
               onClick={() => setActiveTab('tracked')}
               style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                fontSize: '13px',
+                padding: '6px 14px',
+                borderRadius: '5px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                backgroundColor: activeTab === 'tracked' ? 'var(--accent)' : 'var(--surface)',
-                color: activeTab === 'tracked' ? '#ffffff' : 'var(--text)',
-                border: activeTab === 'tracked' ? '1px solid var(--accent)' : '1px solid var(--border)',
-                transition: 'all 0.15s ease',
+                backgroundColor: activeTab === 'tracked' ? 'var(--accent)' : 'transparent',
+                color: activeTab === 'tracked' ? '#ffffff' : 'var(--text-muted)',
+                border: 'none',
+                transition: 'all 0.12s ease',
               }}
             >
               Tracked Repositories ({trackedRepos.length})
@@ -156,22 +164,22 @@ export default function RepositoriesPage() {
             <button
               onClick={() => setActiveTab('available')}
               style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                fontSize: '13px',
+                padding: '6px 14px',
+                borderRadius: '5px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                backgroundColor: activeTab === 'available' ? 'var(--accent)' : 'var(--surface)',
-                color: activeTab === 'available' ? '#ffffff' : 'var(--text)',
-                border: activeTab === 'available' ? '1px solid var(--accent)' : '1px solid var(--border)',
-                transition: 'all 0.15s ease',
+                backgroundColor: activeTab === 'available' ? 'var(--accent)' : 'transparent',
+                color: activeTab === 'available' ? '#ffffff' : 'var(--text-muted)',
+                border: 'none',
+                transition: 'all 0.12s ease',
               }}
             >
               Available Repositories ({availableRepos.length})
             </button>
           </div>
 
-          <div style={{ width: '280px' }}>
+          <div style={{ width: '260px' }}>
             <input
               type="text"
               className="prism-input"
@@ -186,20 +194,20 @@ export default function RepositoriesPage() {
         {activeTab === 'tracked' && (
           <div className="prism-card" style={{ padding: 0, overflow: 'hidden' }}>
             {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                 Loading tracked repositories...
               </div>
             ) : filteredTracked.length === 0 ? (
-              <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ fontSize: '15px', color: 'var(--text-h)', marginBottom: '6px' }}>
+              <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '14.5px', color: 'var(--text-h)', marginBottom: '4px', fontWeight: 600 }}>
                   No repositories tracked yet
                 </div>
-                <div style={{ fontSize: '13px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12.5px', marginBottom: '14px', maxWidth: '420px', margin: '0 auto 14px' }}>
                   Select repositories from your connected GitHub App to start monitoring PRs and indexing code.
                 </div>
                 <button
                   onClick={() => setActiveTab('available')}
-                  className="prism-btn prism-btn-primary"
+                  className="prism-btn prism-btn-primary prism-btn-sm"
                 >
                   Browse Available Repositories →
                 </button>
@@ -231,8 +239,19 @@ export default function RepositoriesPage() {
                           {repo.fullName}
                         </Link>
                         {repo.defaultBranch && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                            ({repo.defaultBranch})
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontFamily: 'var(--mono)',
+                              color: 'var(--text-muted)',
+                              backgroundColor: 'var(--surface-hover)',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              marginLeft: '8px',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            {repo.defaultBranch}
                           </span>
                         )}
                       </td>
@@ -242,7 +261,7 @@ export default function RepositoriesPage() {
                       <td>
                         <StatusBadge type="index" value={repo.indexStatus} />
                       </td>
-                      <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      <td style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                         {repo.lastIndexedAt
                           ? new Date(repo.lastIndexedAt).toLocaleDateString() +
                             ' ' +
@@ -253,19 +272,17 @@ export default function RepositoriesPage() {
                         <span style={{ fontWeight: 600 }}>{repo.totalReviewRuns ?? 0}</span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <Link
                             href={`/repositories/${repo.id}`}
-                            className="prism-btn prism-btn-secondary"
-                            style={{ fontSize: '11px', padding: '4px 8px' }}
+                            className="prism-btn prism-btn-secondary prism-btn-sm"
                           >
                             View
                           </Link>
                           <button
                             onClick={() => handleReindex(repo)}
                             disabled={actionLoadingId === repo.id || repo.indexStatus === 'INDEXING' || reindexMutation.isPending}
-                            className="prism-btn prism-btn-secondary"
-                            style={{ fontSize: '11px', padding: '4px 8px' }}
+                            className="prism-btn prism-btn-secondary prism-btn-sm"
                             title="Trigger full re-indexing of this repository"
                           >
                             {actionLoadingId === repo.id && repo.indexStatus !== 'INDEXING'
@@ -275,8 +292,7 @@ export default function RepositoriesPage() {
                           <button
                             onClick={() => handleUntrack(repo)}
                             disabled={actionLoadingId === repo.id || untrackMutation.isPending}
-                            className="prism-btn prism-btn-danger"
-                            style={{ fontSize: '11px', padding: '4px 8px' }}
+                            className="prism-btn prism-btn-danger prism-btn-sm"
                           >
                             Untrack
                           </button>
@@ -293,20 +309,20 @@ export default function RepositoriesPage() {
         {/* TAB 2: AVAILABLE REPOSITORIES */}
         {activeTab === 'available' && (
           <div className="prism-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontSize: '13px', color: 'var(--text-muted)' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-muted)' }}>
               These repositories are accessible via your connected GitHub App installation. Click <strong>Track</strong> to begin automated reviews and asynchronous indexing.
             </div>
 
             {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                 Loading available repositories...
               </div>
             ) : filteredAvailable.length === 0 ? (
-              <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ fontSize: '15px', color: 'var(--text-h)', marginBottom: '6px' }}>
+              <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '14.5px', color: 'var(--text-h)', marginBottom: '4px', fontWeight: 600 }}>
                   No repositories found
                 </div>
-                <div style={{ fontSize: '13px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12.5px', marginBottom: '14px' }}>
                   Make sure you have granted the PRism GitHub App access to your repositories.
                 </div>
                 <ConnectGitHubBanner />
@@ -329,8 +345,19 @@ export default function RepositoriesPage() {
                           {repo.fullName}
                         </span>
                         {repo.defaultBranch && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                            ({repo.defaultBranch})
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontFamily: 'var(--mono)',
+                              color: 'var(--text-muted)',
+                              backgroundColor: 'var(--surface-hover)',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              marginLeft: '8px',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            {repo.defaultBranch}
                           </span>
                         )}
                       </td>
@@ -347,7 +374,7 @@ export default function RepositoriesPage() {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              fontSize: '12px',
+                              fontSize: '11.5px',
                               color: '#34d399',
                               fontWeight: 600,
                             }}
@@ -358,10 +385,9 @@ export default function RepositoriesPage() {
                           <button
                             onClick={() => handleTrack(repo)}
                             disabled={actionLoadingId === repo.id || trackMutation.isPending}
-                            className="prism-btn prism-btn-primary"
-                            style={{ fontSize: '11px', padding: '5px 12px' }}
+                            className="prism-btn prism-btn-primary prism-btn-sm"
                           >
-                            {actionLoadingId === repo.id ? 'Tracking & Indexing...' : '+ Track'}
+                            {actionLoadingId === repo.id ? 'Tracking...' : '+ Track'}
                           </button>
                         )}
                       </td>

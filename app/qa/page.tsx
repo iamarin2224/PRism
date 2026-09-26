@@ -290,7 +290,7 @@ function CodeQAChatContent() {
           style={{
             width: '320px',
             minWidth: '320px',
-            backgroundColor: '#0b1329',
+            backgroundColor: 'var(--surface)',
             borderRight: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
@@ -298,26 +298,26 @@ function CodeQAChatContent() {
           }}
         >
           {/* Section 1: Repositories List */}
-          <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                REPOSITORIES
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Codebases ({allRepos.length})
               </span>
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="prism-btn prism-btn-secondary"
-                style={{ fontSize: '11px', padding: '3px 8px' }}
+                style={{ fontSize: '11px', padding: '3px 8px', height: '24px' }}
                 title="Add tracked or public repository"
               >
                 + Add Repo
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflowY: 'auto' }}>
               {loadingRepos ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px' }}>Loading repositories...</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 4px' }}>Loading repositories...</div>
               ) : allRepos.length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 4px' }}>
                   No repositories found.{' '}
                   <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -336,15 +336,15 @@ function CodeQAChatContent() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        fontSize: '10px',
+                        fontSize: '10.5px',
                         fontWeight: 700,
                         color: 'var(--text-muted)',
-                        opacity: 0.85,
+                        letterSpacing: '0.04em',
                         marginBottom: '4px',
                         textTransform: 'uppercase',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        padding: '3px 4px',
+                        padding: '4px 6px',
                         borderRadius: '4px',
                         transition: 'background-color 0.1s ease',
                       }}
@@ -352,14 +352,17 @@ function CodeQAChatContent() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       title="Click to collapse / expand"
                     >
-                      <span>├── My Repositories ({repoData?.myRepos?.length || 0})</span>
-                      <span style={{ fontSize: '9px', opacity: 0.75 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span>📁</span>
+                        <span>My Repositories ({repoData?.myRepos?.length || 0})</span>
+                      </span>
+                      <span style={{ fontSize: '9px', opacity: 0.7 }}>
                         {myReposCollapsed ? '▶' : '▼'}
                       </span>
                     </div>
 
                     {!myReposCollapsed && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '6px' }}>
                         {repoData?.myRepos
                           ?.filter((r) => r.indexStatus !== 'FAILED')
                           ?.map((r) => {
@@ -374,18 +377,18 @@ function CodeQAChatContent() {
                               onClick={() => handleSelectRepo(r.fullName)}
                               style={{
                                 padding: '6px 8px',
-                                borderRadius: '4px',
+                                borderRadius: '6px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
-                                border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
-                                transition: 'all 0.1s ease',
+                                backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.12)' : 'transparent',
+                                border: isSelected ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid transparent',
+                                transition: 'all 0.12s ease',
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: '13px' }}>⑂</span>
+                                <span style={{ fontSize: '12px', opacity: 0.7 }}>⑂</span>
                                 <span
                                   style={{
                                     fontSize: '12px',
@@ -404,46 +407,52 @@ function CodeQAChatContent() {
                               {isUpToDate && (
                                 <span
                                   style={{
-                                    fontSize: '9px',
+                                    fontSize: '9.5px',
                                     fontWeight: 600,
                                     padding: '1px 5px',
-                                    borderRadius: '3px',
-                                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)',
                                     color: '#34d399',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px',
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  ● Up to date
+                                  ● Indexed
                                 </span>
                               )}
                               {isStale && (
                                 <span
                                   style={{
-                                    fontSize: '9px',
+                                    fontSize: '9.5px',
                                     fontWeight: 600,
                                     padding: '1px 5px',
-                                    borderRadius: '3px',
-                                    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'rgba(234, 179, 8, 0.12)',
+                                    border: '1px solid rgba(234, 179, 8, 0.25)',
                                     color: '#fde047',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px',
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  ⚠ Needs sync
+                                  ⚠ Sync
                                 </span>
                               )}
                               {isIndexing && (
                                 <span
                                   style={{
-                                    fontSize: '9px',
+                                    fontSize: '9.5px',
                                     fontWeight: 600,
                                     padding: '1px 5px',
-                                    borderRadius: '3px',
-                                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                                    border: '1px solid rgba(245, 158, 11, 0.25)',
                                     color: '#fbbf24',
+                                    flexShrink: 0,
                                   }}
                                 >
                                   ◐ Indexing
@@ -467,15 +476,15 @@ function CodeQAChatContent() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        fontSize: '10px',
+                        fontSize: '10.5px',
                         fontWeight: 700,
                         color: 'var(--text-muted)',
-                        opacity: 0.85,
+                        letterSpacing: '0.04em',
                         marginBottom: '4px',
                         textTransform: 'uppercase',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        padding: '3px 4px',
+                        padding: '4px 6px',
                         borderRadius: '4px',
                         transition: 'background-color 0.1s ease',
                       }}
@@ -483,17 +492,20 @@ function CodeQAChatContent() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       title="Click to collapse / expand"
                     >
-                      <span>
-                        └── Explored Repositories (
-                        {repoData?.exploredRepos?.filter((r) => r.indexStatus !== 'FAILED')?.length || 0})
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span>🌐</span>
+                        <span>
+                          Explored Repositories (
+                          {repoData?.exploredRepos?.filter((r) => r.indexStatus !== 'FAILED')?.length || 0})
+                        </span>
                       </span>
-                      <span style={{ fontSize: '9px', opacity: 0.75 }}>
+                      <span style={{ fontSize: '9px', opacity: 0.7 }}>
                         {exploredReposCollapsed ? '▶' : '▼'}
                       </span>
                     </div>
 
                     {!exploredReposCollapsed && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '6px' }}>
                         {repoData?.exploredRepos
                           ?.filter((r) => r.indexStatus !== 'FAILED')
                           ?.map((r) => {
@@ -505,18 +517,18 @@ function CodeQAChatContent() {
                               onClick={() => handleSelectRepo(r.fullName)}
                               style={{
                                 padding: '6px 8px',
-                                borderRadius: '4px',
+                                borderRadius: '6px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
-                                border: isSelected ? '1px solid var(--accent-border)' : '1px solid transparent',
-                                transition: 'all 0.1s ease',
+                                backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.12)' : 'transparent',
+                                border: isSelected ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid transparent',
+                                transition: 'all 0.12s ease',
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
-                                <span style={{ fontSize: '13px' }}>🌐</span>
+                                <span style={{ fontSize: '12px', opacity: 0.7 }}>🌐</span>
                                 <span
                                   style={{
                                     fontSize: '12px',
@@ -536,11 +548,12 @@ function CodeQAChatContent() {
                                 {isIndexing && (
                                   <span
                                     style={{
-                                      fontSize: '9px',
+                                      fontSize: '9.5px',
                                       fontWeight: 600,
                                       padding: '1px 5px',
-                                      borderRadius: '3px',
-                                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                      borderRadius: '4px',
+                                      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                                      border: '1px solid rgba(245, 158, 11, 0.25)',
                                       color: '#fbbf24',
                                     }}
                                   >
@@ -559,8 +572,11 @@ function CodeQAChatContent() {
                                     color: 'var(--text-muted)',
                                     cursor: 'pointer',
                                     fontSize: '11px',
-                                    padding: '2px',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px',
                                   }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--status-red)')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
                                 >
                                   ✕
                                 </button>
@@ -583,19 +599,20 @@ function CodeQAChatContent() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div
               style={{
-                padding: '14px 16px 10px',
+                padding: '12px 16px 10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 borderBottom: '1px solid var(--border)',
+                backgroundColor: 'rgba(0,0,0,0.1)',
               }}
             >
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                  CHATS ({conversations?.length || 0})
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Threads ({conversations?.length || 0})
                 </span>
                 {selectedRepo && (
-                  <div style={{ fontSize: '11px', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px', marginTop: '1px' }}>
                     {selectedRepo}
                   </div>
                 )}
@@ -604,7 +621,7 @@ function CodeQAChatContent() {
                 onClick={handleNewConversation}
                 disabled={!selectedRepo || createConvMutation.isPending}
                 className="prism-btn prism-btn-primary"
-                style={{ fontSize: '11px', padding: '4px 10px' }}
+                style={{ fontSize: '11px', padding: '3px 9px', height: '24px' }}
               >
                 + New Chat
               </button>
@@ -612,7 +629,7 @@ function CodeQAChatContent() {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
               {loadingConvs ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px', textAlign: 'center' }}>
                   Loading chat history...
                 </div>
               ) : !selectedRepo ? (
@@ -620,17 +637,17 @@ function CodeQAChatContent() {
                   Select a repository to view conversations.
                 </div>
               ) : conversations?.length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px', textAlign: 'center' }}>
-                  No chats yet for this repository.{' '}
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '20px 16px', textAlign: 'center', lineHeight: 1.5 }}>
+                  No conversations yet.{' '}
                   <button
                     onClick={handleNewConversation}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontWeight: 500 }}
                   >
-                    Start one!
+                    Start a thread
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   {conversations?.map((conv) => {
                     const isActive = activeConversationId === conv.id;
                     return (
@@ -638,7 +655,7 @@ function CodeQAChatContent() {
                         key={conv.id}
                         onClick={() => handleSelectConversation(conv.id)}
                         style={{
-                          padding: '10px 12px',
+                          padding: '8px 10px',
                           borderRadius: '6px',
                           cursor: 'pointer',
                           backgroundColor: isActive ? 'var(--surface-hover)' : 'transparent',
@@ -647,24 +664,28 @@ function CodeQAChatContent() {
                           alignItems: 'flex-start',
                           justifyContent: 'space-between',
                           gap: '8px',
-                          transition: 'all 0.15s ease',
+                          transition: 'all 0.12s ease',
                         }}
                       >
                         <div style={{ overflow: 'hidden', flex: 1 }}>
                           <div
                             style={{
-                              fontSize: '13px',
-                              fontWeight: isActive ? 600 : 500,
+                              fontSize: '12.5px',
+                              fontWeight: isActive ? 600 : 400,
                               color: isActive ? '#ffffff' : 'var(--text)',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
                             }}
                           >
-                            💬 {conv.title}
+                            <span style={{ fontSize: '11px', opacity: 0.7 }}>💬</span>
+                            <span>{conv.title}</span>
                           </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {new Date(conv.updatedAt).toLocaleDateString()} • {conv.messageCount} msgs
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px', paddingLeft: '17px' }}>
+                            {new Date(conv.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {conv.messageCount} {conv.messageCount === 1 ? 'msg' : 'msgs'}
                           </div>
                         </div>
 
@@ -676,20 +697,27 @@ function CodeQAChatContent() {
                               setActiveConversationId(null);
                             }
                           }}
-                          title="Delete conversation"
+                          title="Delete thread"
                           style={{
                             background: 'transparent',
                             border: 'none',
                             color: 'var(--text-muted)',
                             cursor: 'pointer',
-                            fontSize: '12px',
+                            fontSize: '11px',
                             padding: '2px 4px',
-                            opacity: 0.6,
+                            opacity: 0.5,
+                            borderRadius: '3px',
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                            e.currentTarget.style.color = 'var(--status-red)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = '0.5';
+                            e.currentTarget.style.color = 'var(--text-muted)';
+                          }}
                         >
-                          🗑
+                          ✕
                         </button>
                       </div>
                     );
@@ -717,9 +745,11 @@ function CodeQAChatContent() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>TARGET CODEBASE:</span>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>{selectedRepo || 'No repository selected'}</span>
+                <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Target Codebase
+                </span>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '1px' }}>
+                  <span style={{ fontFamily: 'var(--mono)' }}>{selectedRepo || 'No repository selected'}</span>
                   {activeRepo && activeRepo.type === 'my_repo' && (
                     <StatusBadge type="index" value={activeRepo.indexStatus} size="sm" />
                   )}
@@ -731,17 +761,17 @@ function CodeQAChatContent() {
             </div>
 
             {activeRepo && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {activeRepo.lastIndexedAt && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Last indexed: {new Date(activeRepo.lastIndexedAt).toLocaleDateString()}
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                    Indexed {new Date(activeRepo.lastIndexedAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 <button
                   onClick={handleReindex}
                   disabled={reindexing || isIndexing}
                   className="prism-btn prism-btn-secondary"
-                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                  style={{ fontSize: '11px', padding: '4px 10px', height: '26px' }}
                 >
                   {reindexing || isIndexing ? '⏳ Indexing...' : '↻ Re-index'}
                 </button>
@@ -753,9 +783,9 @@ function CodeQAChatContent() {
           {isIndexing && (
             <div
               style={{
-                padding: '10px 24px',
-                backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+                padding: '9px 24px',
+                backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
                 color: '#fbbf24',
                 fontSize: '12px',
                 display: 'flex',
@@ -763,30 +793,42 @@ function CodeQAChatContent() {
                 gap: '8px',
               }}
             >
-              ⏳ Indexing is running in the background. Embeddings will be queried as soon as chunk generation completes.
+              <span>⏳</span>
+              <span>Vector indexing in progress. Search embeddings will update in real time as chunks complete.</span>
             </div>
           )}
 
           {isStale && (
             <div
               style={{
-                padding: '10px 24px',
-                backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                borderBottom: '1px solid rgba(234, 179, 8, 0.3)',
+                padding: '9px 24px',
+                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                borderBottom: '1px solid rgba(234, 179, 8, 0.25)',
                 color: '#facc15',
                 fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              ⚠ Repository has new commits since last indexing. Query results reflect commit {activeRepo?.indexedCommit?.slice(0, 7) || 'previous'}.
+              <span>⚠ Repository has new commits since last indexing. Query results reflect commit {activeRepo?.indexedCommit?.slice(0, 7) || 'previous'}.</span>
+              <button
+                onClick={handleReindex}
+                disabled={reindexing}
+                className="prism-btn prism-btn-secondary"
+                style={{ fontSize: '10px', padding: '2px 8px', height: '22px' }}
+              >
+                Sync Now
+              </button>
             </div>
           )}
 
           {isNotIndexed && (
             <div
               style={{
-                padding: '10px 24px',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
+                padding: '9px 24px',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                borderBottom: '1px solid rgba(239, 68, 68, 0.25)',
                 color: '#f87171',
                 fontSize: '12px',
                 display: 'flex',
@@ -799,7 +841,7 @@ function CodeQAChatContent() {
                 onClick={handleReindex}
                 disabled={reindexing}
                 className="prism-btn prism-btn-primary"
-                style={{ fontSize: '11px', padding: '4px 10px' }}
+                style={{ fontSize: '11px', padding: '3px 10px', height: '24px' }}
               >
                 Trigger Indexing Now →
               </button>
@@ -810,8 +852,10 @@ function CodeQAChatContent() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {!selectedRepo ? (
               <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '480px' }}>
-                <div style={{ fontSize: '40px', marginBottom: '12px' }}>💬</div>
-                <h3 style={{ fontSize: '18px', color: 'var(--text-h)', margin: '0 0 8px' }}>Select a Repository</h3>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', marginBottom: '14px' }}>
+                  💬
+                </div>
+                <h3 style={{ fontSize: '17px', color: 'var(--text-h)', margin: '0 0 8px', fontWeight: 600 }}>Select a Codebase</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
                   Choose a tracked codebase or explore any public GitHub repository to start asking questions grounded in source code embeddings.
                 </p>
@@ -821,13 +865,15 @@ function CodeQAChatContent() {
                 Loading conversation messages...
               </div>
             ) : (!currentConversation?.messages || currentConversation.messages.length === 0) ? (
-              <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '540px' }}>
-                <div style={{ fontSize: '36px', marginBottom: '12px' }}>⚡</div>
-                <h3 style={{ fontSize: '18px', color: 'var(--text-h)', margin: '0 0 8px' }}>
+              <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '560px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(56, 189, 248, 0.2) 100%)', border: '1px solid rgba(168, 85, 247, 0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', marginBottom: '14px' }}>
+                  ⚡
+                </div>
+                <h3 style={{ fontSize: '18px', color: 'var(--text-h)', margin: '0 0 8px', fontWeight: 700 }}>
                   Ask anything about {selectedRepo}
                 </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '20px' }}>
-                  PRism retrieves code chunks via pgvector cosine similarity search and provides grounded, multi-file code explanations with direct source references.
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '24px' }}>
+                  PRism performs pgvector cosine similarity search over your repository chunks and synthesizes grounded answers with direct line citations.
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -837,25 +883,31 @@ function CodeQAChatContent() {
                       onClick={() => setInputMessage(prompt)}
                       style={{
                         padding: '10px 14px',
-                        borderRadius: '6px',
+                        borderRadius: '8px',
                         backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
-                        fontSize: '12px',
+                        fontSize: '12.5px',
                         textAlign: 'left',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--accent)';
+                        e.currentTarget.style.borderColor = 'var(--accent-border)';
+                        e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
                         e.currentTarget.style.color = '#ffffff';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.backgroundColor = 'var(--surface)';
                         e.currentTarget.style.color = 'var(--text)';
                       }}
                     >
-                      💡 {prompt}
+                      <span style={{ color: 'var(--accent)', fontSize: '14px' }}>💡</span>
+                      <span>{prompt}</span>
                     </button>
                   ))}
                 </div>
@@ -895,10 +947,10 @@ function CodeQAChatContent() {
                         maxWidth: '85%',
                         padding: '16px 20px',
                         borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                        backgroundColor: isUser ? 'rgba(168, 85, 247, 0.12)' : '#0f172a',
+                        backgroundColor: isUser ? 'rgba(168, 85, 247, 0.1)' : '#0d1527',
                         border: isUser ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid var(--border)',
                         color: isUser ? '#ffffff' : '#f1f5f9',
-                        fontSize: '14px',
+                        fontSize: '13.5px',
                         lineHeight: 1.65,
                       }}
                     >
@@ -913,10 +965,10 @@ function CodeQAChatContent() {
                         <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                           <div
                             style={{
-                              fontSize: '11px',
+                              fontSize: '10.5px',
                               fontWeight: 700,
                               color: 'var(--text-muted)',
-                              letterSpacing: '0.04em',
+                              letterSpacing: '0.05em',
                               textTransform: 'uppercase',
                               marginBottom: '8px',
                             }}
@@ -929,7 +981,7 @@ function CodeQAChatContent() {
                                 key={sIdx}
                                 style={{
                                   padding: '8px 10px',
-                                  borderRadius: '4px',
+                                  borderRadius: '6px',
                                   backgroundColor: 'var(--code-bg)',
                                   border: '1px solid var(--border)',
                                   fontSize: '12px',
@@ -981,7 +1033,7 @@ function CodeQAChatContent() {
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>✨ PRism Intelligence</span>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>
-                    Streaming...
+                    Synthesizing response...
                   </span>
                 </div>
 
@@ -991,11 +1043,11 @@ function CodeQAChatContent() {
                     maxWidth: '85%',
                     padding: '16px 20px',
                     borderRadius: '12px 12px 12px 2px',
-                    backgroundColor: '#0f172a',
+                    backgroundColor: '#0d1527',
                     border: '1px solid var(--accent-border)',
-                    boxShadow: '0 0 15px rgba(168, 85, 247, 0.08)',
+                    boxShadow: '0 0 20px rgba(168, 85, 247, 0.08)',
                     color: '#f1f5f9',
-                    fontSize: '14px',
+                    fontSize: '13.5px',
                     lineHeight: 1.65,
                   }}
                 >
@@ -1025,7 +1077,7 @@ function CodeQAChatContent() {
                           animation: 'pulse 1.2s infinite',
                         }}
                       />
-                      <span>Searching vector embeddings and synthesizing answer...</span>
+                      <span>Querying vector store and synthesizing codebase answer...</span>
                     </div>
                   )}
 
@@ -1034,10 +1086,10 @@ function CodeQAChatContent() {
                     <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                       <div
                         style={{
-                          fontSize: '11px',
+                          fontSize: '10.5px',
                           fontWeight: 700,
                           color: 'var(--text-muted)',
-                          letterSpacing: '0.04em',
+                          letterSpacing: '0.05em',
                           textTransform: 'uppercase',
                           marginBottom: '8px',
                         }}
@@ -1050,7 +1102,7 @@ function CodeQAChatContent() {
                             key={sIdx}
                             style={{
                               padding: '8px 10px',
-                              borderRadius: '4px',
+                              borderRadius: '6px',
                               backgroundColor: 'var(--code-bg)',
                               border: '1px solid var(--border)',
                               fontSize: '12px',
@@ -1094,7 +1146,7 @@ function CodeQAChatContent() {
           {/* Sticky Bottom Input Bar */}
           <div
             style={{
-              padding: '16px 24px',
+              padding: '14px 24px',
               borderTop: '1px solid var(--border)',
               backgroundColor: 'var(--surface)',
             }}
@@ -1110,7 +1162,7 @@ function CodeQAChatContent() {
                     ? isStreaming
                       ? 'Generating response...'
                       : `Ask anything about ${selectedRepo}... (Enter to send, Shift+Enter for newline)`
-                    : 'Select a repository above first...'
+                    : 'Select a codebase above to start asking questions...'
                 }
                 disabled={!selectedRepo || isStreaming}
                 style={{
@@ -1126,6 +1178,7 @@ function CodeQAChatContent() {
                   resize: 'none',
                   fontFamily: 'inherit',
                   opacity: isStreaming ? 0.7 : 1,
+                  transition: 'border-color 0.15s ease',
                 }}
               />
 
@@ -1133,7 +1186,7 @@ function CodeQAChatContent() {
                 type="submit"
                 disabled={!selectedRepo || !inputMessage.trim() || isStreaming}
                 className="prism-btn prism-btn-primary"
-                style={{ padding: '10px 20px', fontSize: '13px', height: '44px', flexShrink: 0 }}
+                style={{ padding: '10px 18px', fontSize: '13px', height: '44px', flexShrink: 0 }}
               >
                 {isStreaming ? 'Streaming...' : 'Send →'}
               </button>

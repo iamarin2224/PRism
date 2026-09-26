@@ -39,7 +39,7 @@ export default function ReviewDetailPage({
 
   if (loading) {
     return (
-      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
         Loading review report...
       </div>
     );
@@ -47,15 +47,16 @@ export default function ReviewDetailPage({
 
   if (error || !review) {
     return (
-      <div style={{ padding: '40px 32px' }}>
+      <div style={{ padding: '32px' }}>
         <div
           style={{
-            padding: '16px',
+            padding: '14px 18px',
             borderRadius: '6px',
             backgroundColor: 'var(--status-red-bg)',
             border: '1px solid var(--status-red-border)',
             color: 'var(--status-red)',
             marginBottom: '16px',
+            fontSize: '13px',
           }}
         >
           {error || 'Review not found'}
@@ -68,7 +69,6 @@ export default function ReviewDetailPage({
   }
 
   const isAwaitingApproval = review.status === 'AWAITING_HUMAN_APPROVAL';
-  const isCompleted = review.status === 'COMPLETED';
   const isInProgress = review.status === 'IN_PROGRESS' || review.status === 'QUEUED';
 
   const filteredFindings =
@@ -86,12 +86,10 @@ export default function ReviewDetailPage({
   // Extract events metadata for summary
   const summaryEvent = events.find((e) => e.nodeName === 'agent_summary' || e.eventType === 'PR_SUMMARY_GENERATED');
   const prSummary: any = summaryEvent?.payload || null;
-  const contextEvent = events.find((e) => e.nodeName === 'build_context');
   const securityEvent = events.find((e) => e.nodeName === 'specialist_security');
   const qualityEvent = events.find((e) => e.nodeName === 'specialist_quality');
   const testsEvent = events.find((e) => e.nodeName === 'specialist_tests');
   const docsEvent = events.find((e) => e.nodeName === 'specialist_docs');
-  const criticEvent = events.find((e) => e.nodeName === 'critic_verifier');
 
   // Generate copyable markdown report
   const generatedMarkdownReport = `# 🤖 PRism Automated Code Intelligence Report
@@ -166,14 +164,14 @@ ${
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               onClick={copyMarkdownToClipboard}
-              className="prism-btn prism-btn-secondary"
+              className="prism-btn prism-btn-secondary prism-btn-sm"
               title="Copy GitHub Review Markdown"
             >
-              {copiedMarkdown ? '✓ Copied Markdown' : '📋 Copy GitHub Report'}
+              {copiedMarkdown ? '✓ Copied Report' : '📋 Copy Report'}
             </button>
             <button
               onClick={() => refetch()}
-              className="prism-btn prism-btn-secondary"
+              className="prism-btn prism-btn-secondary prism-btn-sm"
               title="Refresh review data"
             >
               ↻ Refresh
@@ -181,21 +179,21 @@ ${
             {review.repositoryId && (
               <Link
                 href={`/repositories/${review.repositoryId}`}
-                className="prism-btn prism-btn-secondary"
+                className="prism-btn prism-btn-secondary prism-btn-sm"
               >
-                Repository Info
+                Repository
               </Link>
             )}
           </div>
         }
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {/* Human-in-the-Loop Approval Action Banner */}
         {isAwaitingApproval && (
           <div
             style={{
-              padding: '20px 24px',
+              padding: '16px 20px',
               borderRadius: '8px',
               backgroundColor: 'rgba(245, 158, 11, 0.08)',
               border: '1px solid rgba(245, 158, 11, 0.4)',
@@ -203,19 +201,19 @@ ${
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '20px',
+              flexWrap: 'wrap',
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '18px' }}>✋</span>
-                <h3 style={{ margin: 0, fontSize: '16px', color: '#fbbf24', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                <span style={{ fontSize: '16px' }}>✋</span>
+                <h3 style={{ margin: 0, fontSize: '15px', color: '#fbbf24', fontWeight: 600 }}>
                   Human Approval Required
                 </h3>
               </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text)' }}>
-                This review was paused by the confidence & severity gate (detected{' '}
-                {criticalCount > 0 ? `${criticalCount} critical finding(s)` : 'findings requiring confirmation'}).
-                Inspect the verified findings below and approve to post the formatted review directly to GitHub.
+              <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text)' }}>
+                This review was paused by the confidence gate ({criticalCount > 0 ? `${criticalCount} critical finding(s)` : 'actionable findings'}).
+                Verify findings and click approve to post the report directly to GitHub.
               </p>
             </div>
 
@@ -224,12 +222,10 @@ ${
               disabled={approveMutation.isPending}
               className="prism-btn prism-btn-primary"
               style={{
-                fontSize: '13px',
-                padding: '10px 20px',
                 backgroundColor: '#fbbf24',
                 color: '#000000',
                 fontWeight: 700,
-                flexShrink: 0,
+                padding: '9px 18px',
               }}
             >
               {approveMutation.isPending ? 'Posting to GitHub...' : 'Approve & Post Review'}
@@ -241,10 +237,10 @@ ${
         {isInProgress && (
           <div
             style={{
-              padding: '16px 20px',
+              padding: '14px 18px',
               borderRadius: '8px',
               backgroundColor: 'rgba(56, 189, 248, 0.08)',
-              border: '1px solid rgba(56, 189, 248, 0.35)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
@@ -252,16 +248,17 @@ ${
           >
             <div
               style={{
-                width: '12px',
-                height: '12px',
+                width: '10px',
+                height: '10px',
                 borderRadius: '50%',
                 backgroundColor: 'var(--accent-cyan)',
                 animation: 'pulse 1.2s infinite',
+                flexShrink: 0,
               }}
             />
             <div>
-              <div style={{ fontWeight: 600, color: 'var(--accent-cyan)', fontSize: '14px' }}>
-                Review In Progress
+              <div style={{ fontWeight: 600, color: 'var(--accent-cyan)', fontSize: '13.5px' }}>
+                Review Execution In Progress
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text)' }}>
                 Parallel specialist agents (Security, Quality, Tests, Docs) and Critic Verifier are actively executing. Telemetry will update in real time.
@@ -271,10 +268,10 @@ ${
         )}
 
         {/* Review Metadata Summary Card */}
-        <div className="prism-card" style={{ padding: '20px' }}>
+        <div className="prism-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                 STATUS
               </span>
               <div style={{ marginTop: '4px' }}>
@@ -283,7 +280,7 @@ ${
             </div>
 
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                 VERDICT
               </span>
               <div style={{ marginTop: '4px' }}>
@@ -292,10 +289,10 @@ ${
             </div>
 
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                TOTAL FINDINGS
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                FINDINGS
               </span>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-h)', marginTop: '2px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-h)', marginTop: '2px' }}>
                 {review.findings.length}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -304,26 +301,26 @@ ${
             </div>
 
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                 EXECUTION TIME
               </span>
-              <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-h)', marginTop: '2px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-h)', marginTop: '2px', fontFamily: 'var(--mono)' }}>
                 {review.durationMs ? `${(review.durationMs / 1000).toFixed(2)}s` : '—'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Total swarm latency
+                Swarm latency
               </div>
             </div>
 
             <div>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                EVENTS SPAN
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                TELEMETRY SPANS
               </span>
-              <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-h)', marginTop: '2px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-h)', marginTop: '2px' }}>
                 {events.length} Spans
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Recorded in telemetry spine
+                Audit spine
               </div>
             </div>
           </div>
@@ -331,19 +328,19 @@ ${
 
         {/* Tab Controls: Overview vs Findings vs Events Spine */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '4px' }}>
             <button
               onClick={() => setActiveTab('overview')}
               style={{
-                padding: '10px 16px',
-                fontSize: '13px',
+                padding: '9px 14px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 backgroundColor: 'transparent',
-                color: activeTab === 'overview' ? 'var(--text-h)' : 'var(--text-muted)',
+                color: activeTab === 'overview' ? '#ffffff' : 'var(--text-muted)',
                 border: 'none',
                 borderBottom: activeTab === 'overview' ? '2px solid var(--accent)' : '2px solid transparent',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
               }}
             >
               📋 Overview & Summary
@@ -351,15 +348,15 @@ ${
             <button
               onClick={() => setActiveTab('findings')}
               style={{
-                padding: '10px 16px',
-                fontSize: '13px',
+                padding: '9px 14px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 backgroundColor: 'transparent',
-                color: activeTab === 'findings' ? 'var(--text-h)' : 'var(--text-muted)',
+                color: activeTab === 'findings' ? '#ffffff' : 'var(--text-muted)',
                 border: 'none',
                 borderBottom: activeTab === 'findings' ? '2px solid var(--accent)' : '2px solid transparent',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
               }}
             >
               🔍 Actionable Findings ({review.findings.length})
@@ -367,15 +364,15 @@ ${
             <button
               onClick={() => setActiveTab('events')}
               style={{
-                padding: '10px 16px',
-                fontSize: '13px',
+                padding: '9px 14px',
+                fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 backgroundColor: 'transparent',
-                color: activeTab === 'events' ? 'var(--text-h)' : 'var(--text-muted)',
+                color: activeTab === 'events' ? '#ffffff' : 'var(--text-muted)',
                 border: 'none',
                 borderBottom: activeTab === 'events' ? '2px solid var(--accent)' : '2px solid transparent',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
               }}
             >
               📊 Telemetry Spine ({events.length})
@@ -384,13 +381,13 @@ ${
 
           {/* Severity filter (only visible on findings tab) */}
           {activeTab === 'findings' && (
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '3px', marginBottom: '6px' }}>
               {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((sev) => (
                 <button
                   key={sev}
                   onClick={() => setSeverityFilter(sev)}
                   style={{
-                    padding: '4px 8px',
+                    padding: '3px 8px',
                     borderRadius: '4px',
                     fontSize: '11px',
                     fontWeight: 600,
@@ -409,63 +406,65 @@ ${
 
         {/* TAB 1: OVERVIEW & SUMMARY */}
         {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Executive Status Banner */}
             <div
               style={{
-                padding: '20px 24px',
+                padding: '16px 20px',
                 borderRadius: '8px',
-                backgroundColor: review.findings.length === 0 ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-                border: `1px solid ${review.findings.length === 0 ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                backgroundColor: review.findings.length === 0 ? 'rgba(16, 185, 129, 0.07)' : 'rgba(244, 63, 94, 0.07)',
+                border: `1px solid ${review.findings.length === 0 ? 'rgba(16, 185, 129, 0.28)' : 'rgba(244, 63, 94, 0.28)'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                gap: '16px',
+                flexWrap: 'wrap',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span style={{ fontSize: '28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '24px' }}>
                   {review.findings.length === 0 ? '✅' : '⚠️'}
                 </span>
                 <div>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: 'var(--text-h)', fontWeight: 700 }}>
+                  <h3 style={{ margin: '0 0 2px', fontSize: '15px', color: 'var(--text-h)', fontWeight: 700 }}>
                     {review.findings.length === 0
                       ? 'Clean Pull Request — All Specialists Passed'
                       : `${review.findings.length} Actionable Finding(s) Identified`}
                   </h3>
-                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-muted)' }}>
                     {review.findings.length === 0
-                      ? 'Multi-agent review completed. No vulnerabilities, architecture flaws, test regressions, or documentation gaps were detected.'
-                      : `${criticalCount} critical and ${highCount} high severity issue(s) were flagged by specialized analysis nodes.`}
+                      ? 'Multi-agent review completed. No vulnerabilities, architecture flaws, test regressions, or documentation gaps detected.'
+                      : `${criticalCount} critical and ${highCount} high severity issue(s) flagged across analyzed files.`}
                   </p>
                 </div>
               </div>
 
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ROUTING ACTION</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-h)', marginTop: '2px' }}>
+                <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 600 }}>ROUTING ACTION</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-h)', marginTop: '2px' }}>
                   {review.routingDecision === 'POST_GITHUB' ? '🚀 Auto-Posted on GitHub' : '✋ Human Approval Required'}
                 </div>
               </div>
             </div>
 
             {/* PR Intent & File Changes Summary Card */}
-            <div className="prism-card" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div className="prism-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '18px' }}>📖</span>
-                  <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-h)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '16px' }}>📖</span>
+                  <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)', fontWeight: 600 }}>
                     Pull Request Summary & File Impact
                   </h3>
                 </div>
                 <span
                   style={{
-                    padding: '3px 10px',
-                    borderRadius: '12px',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
                     color: 'var(--accent-cyan)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}
                 >
                   Synthesized by Summary Agent
@@ -473,17 +472,17 @@ ${
               </div>
 
               {prSummary ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {prSummary.overview && (
                     <div
                       style={{
-                        padding: '14px 16px',
+                        padding: '12px 14px',
                         borderRadius: '6px',
                         backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
-                        fontSize: '13px',
+                        fontSize: '12.5px',
                         lineHeight: '1.6',
-                        color: 'var(--text)',
+                        color: 'var(--text-h)',
                       }}
                     >
                       {prSummary.overview}
@@ -492,10 +491,10 @@ ${
 
                   {Array.isArray(prSummary.key_changes) && prSummary.key_changes.length > 0 && (
                     <div>
-                      <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-h)', fontWeight: 600 }}>
-                        🎯 Key Changes & Functional Capabilities
+                      <h4 style={{ margin: '0 0 6px', fontSize: '12.5px', color: 'var(--text-h)', fontWeight: 600 }}>
+                        🎯 Key Changes & Capabilities
                       </h4>
-                      <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text)', lineHeight: '1.6' }}>
+                      <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12.5px', color: 'var(--text)', lineHeight: '1.6' }}>
                         {prSummary.key_changes.map((kc: string, i: number) => (
                           <li key={i}>{kc}</li>
                         ))}
@@ -505,7 +504,7 @@ ${
 
                   {Array.isArray(prSummary.file_changes) && prSummary.file_changes.length > 0 && (
                     <div>
-                      <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-h)', fontWeight: 600 }}>
+                      <h4 style={{ margin: '0 0 6px', fontSize: '12.5px', color: 'var(--text-h)', fontWeight: 600 }}>
                         📂 Modified Files Breakdown ({prSummary.file_changes.length})
                       </h4>
                       <div
@@ -515,26 +514,21 @@ ${
                           overflow: 'hidden',
                         }}
                       >
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <table className="prism-table" style={{ fontSize: '12px' }}>
                           <thead>
-                            <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-muted)' }}>FILE PATH</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-muted)', width: '100px' }}>ACTION</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-muted)' }}>PURPOSE / CHANGE SUMMARY</th>
+                            <tr>
+                              <th>File Path</th>
+                              <th style={{ width: '100px' }}>Action</th>
+                              <th>Purpose / Summary</th>
                             </tr>
                           </thead>
                           <tbody>
                             {prSummary.file_changes.map((fc: any, i: number) => (
-                              <tr
-                                key={i}
-                                style={{
-                                  borderBottom: i < prSummary.file_changes.length - 1 ? '1px solid var(--border)' : 'none',
-                                }}
-                              >
-                                <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: 'var(--accent-cyan)' }}>
+                              <tr key={i}>
+                                <td style={{ fontFamily: 'var(--mono)', color: 'var(--accent-cyan)' }}>
                                   {fc.file_path}
                                 </td>
-                                <td style={{ padding: '10px 12px' }}>
+                                <td>
                                   <span
                                     style={{
                                       padding: '2px 6px',
@@ -544,22 +538,22 @@ ${
                                       textTransform: 'uppercase',
                                       backgroundColor:
                                         fc.action === 'added'
-                                          ? 'rgba(34, 197, 94, 0.15)'
+                                          ? 'rgba(16, 185, 129, 0.12)'
                                           : fc.action === 'deleted'
-                                          ? 'rgba(239, 68, 68, 0.15)'
-                                          : 'rgba(56, 189, 248, 0.15)',
+                                          ? 'rgba(244, 63, 94, 0.12)'
+                                          : 'rgba(56, 189, 248, 0.12)',
                                       color:
                                         fc.action === 'added'
-                                          ? '#4ade80'
+                                          ? '#34d399'
                                           : fc.action === 'deleted'
-                                          ? '#f87171'
+                                          ? '#fb7185'
                                           : 'var(--accent-cyan)',
                                     }}
                                   >
                                     {fc.action || 'modified'}
                                   </span>
                                 </td>
-                                <td style={{ padding: '10px 12px', color: 'var(--text)' }}>
+                                <td style={{ color: 'var(--text)' }}>
                                   {fc.summary}
                                 </td>
                               </tr>
@@ -596,7 +590,7 @@ ${
                   )}
                 </div>
               ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12.5px' }}>
                   PR summary synthesis details will appear here once the run is complete.
                 </div>
               )}
@@ -604,31 +598,31 @@ ${
 
             {/* Specialist Health Matrix (4 Cards) */}
             <div>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: 'var(--text-h)', fontWeight: 600 }}>
+              <h3 style={{ margin: '0 0 10px', fontSize: '14.5px', color: 'var(--text-h)', fontWeight: 600 }}>
                 🔬 Multi-Agent Specialist Analysis Matrix
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                 {/* Security */}
-                <div className="prism-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>🛡️</span>
-                      <strong style={{ fontSize: '14px', color: 'var(--text-h)' }}>Security Specialist</strong>
+                <div className="prism-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px' }}>🛡️</span>
+                      <strong style={{ fontSize: '13.5px', color: 'var(--text-h)' }}>Security Specialist</strong>
                     </div>
                     <span
                       style={{
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        backgroundColor: securityFindings.length === 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: securityFindings.length === 0 ? '#4ade80' : '#f87171',
+                        backgroundColor: securityFindings.length === 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: securityFindings.length === 0 ? '#34d399' : '#fb7185',
                       }}
                     >
                       {securityFindings.length === 0 ? '✓ PASSED' : `⚠️ ${securityFindings.length} ISSUES`}
                     </span>
                   </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
                     {securityEvent?.payload?.verdict_summary ||
                       (securityFindings.length === 0
                         ? 'Audited PR changeset; verified parameter sanitization, token security, and zero CVE vulnerabilities detected.'
@@ -640,29 +634,29 @@ ${
                 </div>
 
                 {/* Code Quality */}
-                <div className="prism-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>💎</span>
-                      <strong style={{ fontSize: '14px', color: 'var(--text-h)' }}>Quality & Architecture</strong>
+                <div className="prism-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px' }}>💎</span>
+                      <strong style={{ fontSize: '13.5px', color: 'var(--text-h)' }}>Quality & Architecture</strong>
                     </div>
                     <span
                       style={{
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        backgroundColor: qualityFindings.length === 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: qualityFindings.length === 0 ? '#4ade80' : '#f87171',
+                        backgroundColor: qualityFindings.length === 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: qualityFindings.length === 0 ? '#34d399' : '#fb7185',
                       }}
                     >
                       {qualityFindings.length === 0 ? '✓ PASSED' : `⚠️ ${qualityFindings.length} ISSUES`}
                     </span>
                   </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
                     {qualityEvent?.payload?.verdict_summary ||
                       (qualityFindings.length === 0
-                        ? 'Evaluated AST structure and code complexity across changed files; clean architectural separation, DRY adherence, and idiomatic TypeScript verified.'
+                        ? 'Evaluated AST structure and code complexity across changed files; clean architectural separation and DRY adherence verified.'
                         : `Detected ${qualityFindings.length} architectural smell(s) or defect(s).`)}
                   </p>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -671,26 +665,26 @@ ${
                 </div>
 
                 {/* Tests */}
-                <div className="prism-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>🧪</span>
-                      <strong style={{ fontSize: '14px', color: 'var(--text-h)' }}>Test Coverage Specialist</strong>
+                <div className="prism-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px' }}>🧪</span>
+                      <strong style={{ fontSize: '13.5px', color: 'var(--text-h)' }}>Test Coverage Specialist</strong>
                     </div>
                     <span
                       style={{
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        backgroundColor: testFindings.length === 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: testFindings.length === 0 ? '#4ade80' : '#f87171',
+                        backgroundColor: testFindings.length === 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: testFindings.length === 0 ? '#34d399' : '#fb7185',
                       }}
                     >
                       {testFindings.length === 0 ? '✓ PASSED' : `⚠️ ${testFindings.length} ISSUES`}
                     </span>
                   </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
                     {testsEvent?.payload?.verdict_summary ||
                       (testFindings.length === 0
                         ? 'Checked test coverage and regression boundaries; mock isolation, assertions, and boundary conditions verified.'
@@ -702,29 +696,29 @@ ${
                 </div>
 
                 {/* Documentation */}
-                <div className="prism-card" style={{ padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px' }}>📚</span>
-                      <strong style={{ fontSize: '14px', color: 'var(--text-h)' }}>Documentation Specialist</strong>
+                <div className="prism-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '15px' }}>📚</span>
+                      <strong style={{ fontSize: '13.5px', color: 'var(--text-h)' }}>Documentation Specialist</strong>
                     </div>
                     <span
                       style={{
-                        padding: '2px 8px',
+                        padding: '2px 7px',
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        backgroundColor: docFindings.length === 0 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: docFindings.length === 0 ? '#4ade80' : '#f87171',
+                        backgroundColor: docFindings.length === 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: docFindings.length === 0 ? '#34d399' : '#fb7185',
                       }}
                     >
                       {docFindings.length === 0 ? '✓ PASSED' : `⚠️ ${docFindings.length} ISSUES`}
                     </span>
                   </div>
-                  <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5' }}>
                     {docsEvent?.payload?.verdict_summary ||
                       (docFindings.length === 0
-                        ? 'Reviewed exported TypeScript interfaces, props, and API route contracts; types and component contracts are fully documented.'
+                        ? 'Reviewed exported TypeScript interfaces, props, and API route contracts; types and contracts are fully documented.'
                         : `Identified ${docFindings.length} undocumented exported symbol(s).`)}
                   </p>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -735,33 +729,32 @@ ${
             </div>
 
             {/* Rendered Full Markdown Review Report */}
-            <div className="prism-card" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)', fontWeight: 600 }}>
+            <div className="prism-card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '14.5px', color: 'var(--text-h)', fontWeight: 600 }}>
                   📄 Formatted Review Report (GitHub Markdown)
                 </h3>
                 <button
                   onClick={copyMarkdownToClipboard}
-                  className="prism-btn prism-btn-secondary"
-                  style={{ fontSize: '12px', padding: '6px 12px' }}
+                  className="prism-btn prism-btn-secondary prism-btn-sm"
                 >
-                  {copiedMarkdown ? '✓ Copied' : 'Copy Markdown'}
+                  {copiedMarkdown ? '✓ Copied' : '📋 Copy Markdown'}
                 </button>
               </div>
 
               <pre
                 style={{
                   margin: 0,
-                  padding: '16px 20px',
+                  padding: '14px 16px',
                   borderRadius: '6px',
-                  backgroundColor: 'var(--bg-card)',
+                  backgroundColor: 'var(--code-bg)',
                   border: '1px solid var(--border)',
                   color: 'var(--text)',
                   fontSize: '12px',
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--mono)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
-                  lineHeight: '1.6',
+                  lineHeight: '1.55',
                 }}
               >
                 {generatedMarkdownReport}
@@ -784,7 +777,7 @@ ${
                   border: '1px solid var(--border)',
                 }}
               >
-                <div style={{ fontSize: '18px', marginBottom: '6px' }}>✓</div>
+                <div style={{ fontSize: '20px', marginBottom: '6px' }}>✓</div>
                 <div style={{ fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}>
                   No findings detected for this filter
                 </div>
@@ -804,9 +797,9 @@ ${
 
         {/* TAB 3: EVENTS SPINE TIMELINE */}
         {activeTab === 'events' && (
-          <div className="prism-card" style={{ padding: '24px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: 'var(--text-h)' }}>
+          <div className="prism-card" style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: '15px', color: 'var(--text-h)' }}>
                 Append-Only Audit & Telemetry Spine
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
@@ -23,7 +24,6 @@ export function Sidebar() {
           return;
         }
       }
-      // Fallback
       window.location.href = '/api/github/connect-url';
     } catch (err) {
       console.error('Failed to get connect URL:', err);
@@ -80,8 +80,8 @@ export function Sidebar() {
   return (
     <aside
       style={{
-        width: '260px',
-        minWidth: '260px',
+        width: '250px',
+        minWidth: '250px',
         height: '100vh',
         position: 'sticky',
         top: 0,
@@ -99,65 +99,77 @@ export function Sidebar() {
         {/* Brand Header */}
         <div
           style={{
-            padding: '20px 20px 18px',
+            height: '64px',
+            minHeight: '64px',
+            maxHeight: '64px',
+            boxSizing: 'border-box',
+            padding: '0 18px',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '11px',
+            flexShrink: 0,
           }}
         >
           <div
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)',
+              width: '38px',
+              height: '38px',
+              borderRadius: '9px',
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(99, 65, 202, 0.28) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '16px',
-              boxShadow: '0 0 16px rgba(168, 85, 247, 0.4)',
+              flexShrink: 0,
+              boxShadow: '0 0 14px rgba(168, 85, 247, 0.25)',
             }}
           >
-            P
+            <Image
+              src="/PRism.svg"
+              alt="PRism Logo"
+              width={32}
+              height={32}
+              style={{
+                objectFit: 'contain',
+                filter: 'brightness(1.3) contrast(1.1) drop-shadow(0 0 6px rgba(192, 132, 252, 0.4))',
+              }}
+              priority
+            />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <span
                 style={{
                   fontWeight: 700,
-                  fontSize: '17px',
+                  fontSize: '16px',
                   color: 'var(--text-h)',
                   letterSpacing: '-0.02em',
                 }}
               >
                 PRism
               </span>
-              <span
-                style={{
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  padding: '2px 5px',
-                  borderRadius: '3px',
-                  backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                  color: '#c084fc',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                AGENTIC
-              </span>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text)', opacity: 0.7 }}>
-              Code Intelligence
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Agentic Code Intelligence
             </div>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <nav style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <nav style={{ padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div
+            style={{
+              fontSize: '10px',
+              fontWeight: 700,
+              color: 'var(--text-dim)',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              padding: '4px 8px 6px',
+            }}
+          >
+            Platform
+          </div>
           {navItems.map((item) => {
             const isActive =
               item.href === '/'
@@ -171,24 +183,25 @@ export function Sidebar() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
-                  padding: '9px 12px',
+                  gap: '10px',
+                  padding: '8px 10px',
                   borderRadius: '6px',
                   fontSize: '13px',
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? '#ffffff' : 'var(--text)',
-                  backgroundColor: isActive ? 'var(--accent-bg)' : 'transparent',
+                  backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
                   border: isActive ? '1px solid var(--accent-border)' : '1px solid transparent',
                   textDecoration: 'none',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.12s ease',
                 }}
               >
                 <span
                   style={{
-                    fontSize: '15px',
-                    color: isActive ? 'var(--accent)' : 'var(--text)',
+                    fontSize: '14px',
+                    color: isActive ? 'var(--accent-hover)' : 'var(--text-muted)',
                     width: '18px',
                     textAlign: 'center',
+                    lineHeight: 1,
                   }}
                 >
                   {item.icon}
@@ -201,30 +214,30 @@ export function Sidebar() {
       </div>
 
       {/* Bottom Area: GitHub App Connection & User Profile */}
-      <div style={{ padding: '16px 12px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ padding: '14px 12px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {/* Connection status badge / action */}
         {authenticated && (
           <div
             style={{
-              padding: '10px 12px',
+              padding: '8px 10px',
               borderRadius: '6px',
-              backgroundColor: hasInstallation ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
-              border: `1px solid ${hasInstallation ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.3)'}`,
+              backgroundColor: hasInstallation ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.08)',
+              border: `1px solid ${hasInstallation ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.25)'}`,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasInstallation ? '0' : '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasInstallation ? '0' : '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span
                   style={{
-                    width: '7px',
-                    height: '7px',
+                    width: '6px',
+                    height: '6px',
                     borderRadius: '50%',
-                    backgroundColor: hasInstallation ? '#34d399' : '#fbbf24',
+                    backgroundColor: hasInstallation ? '#10b981' : '#f59e0b',
                     display: 'inline-block',
                   }}
                 />
                 <span style={{ fontSize: '11px', fontWeight: 600, color: hasInstallation ? '#34d399' : '#fbbf24' }}>
-                  {hasInstallation ? 'GitHub App Connected' : 'GitHub App Missing'}
+                  {hasInstallation ? 'GitHub App Active' : 'GitHub App Missing'}
                 </span>
               </div>
             </div>
@@ -233,18 +246,8 @@ export function Sidebar() {
               <button
                 onClick={handleConnectGitHub}
                 disabled={connecting}
-                style={{
-                  width: '100%',
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--accent)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'opacity 0.15s ease',
-                }}
+                className="prism-btn prism-btn-primary prism-btn-sm"
+                style={{ width: '100%', marginTop: '4px' }}
               >
                 {connecting ? 'Connecting...' : 'Connect GitHub App'}
               </button>
@@ -259,26 +262,27 @@ export function Sidebar() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '6px 4px',
+              padding: '4px 2px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
                   alt={user.githubUsername}
                   style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '28px',
+                    height: '28px',
                     borderRadius: '50%',
                     border: '1px solid var(--border)',
+                    flexShrink: 0,
                   }}
                 />
               ) : (
                 <div
                   style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '28px',
+                    height: '28px',
                     borderRadius: '50%',
                     backgroundColor: 'var(--surface-hover)',
                     border: '1px solid var(--border)',
@@ -286,8 +290,9 @@ export function Sidebar() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 600,
-                    fontSize: '13px',
+                    fontSize: '12px',
                     color: 'var(--text-h)',
+                    flexShrink: 0,
                   }}
                 >
                   {user.githubUsername.substring(0, 2).toUpperCase()}
@@ -297,7 +302,7 @@ export function Sidebar() {
                 <div
                   style={{
                     fontWeight: 600,
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     color: 'var(--text-h)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -307,8 +312,8 @@ export function Sidebar() {
                 >
                   {user.githubUsername}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text)', opacity: 0.6 }}>
-                  PRism Operator
+                <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                  Developer
                 </div>
               </div>
             </div>
@@ -316,24 +321,8 @@ export function Sidebar() {
             <button
               onClick={logout}
               title="Sign Out"
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                color: 'var(--text)',
-                padding: '4px 8px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#ef4444';
-                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--text)';
-                e.currentTarget.style.borderColor = 'var(--border)';
-              }}
+              className="prism-btn prism-btn-ghost prism-btn-sm"
+              style={{ fontSize: '11px', padding: '3px 6px', color: 'var(--text-muted)' }}
             >
               Sign out
             </button>
@@ -341,22 +330,10 @@ export function Sidebar() {
         ) : (
           <a
             href="/api/auth/github"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--surface-hover)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-h)',
-              textDecoration: 'none',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
+            className="prism-btn prism-btn-secondary prism-btn-sm"
+            style={{ width: '100%', textAlign: 'center' }}
           >
-            <span>Login with GitHub</span>
+            Login with GitHub
           </a>
         )}
       </div>

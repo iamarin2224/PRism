@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { useAuth } from './AuthContext';
 import { Sidebar } from './Sidebar';
 
@@ -22,20 +23,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div
           style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)',
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            background: 'rgba(99, 65, 202, 0.12)',
+            border: '1px solid rgba(99, 65, 202, 0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff',
-            fontWeight: 800,
-            fontSize: '20px',
             animation: 'pulse 1.5s infinite',
           }}
         >
-          P
+          <Image
+            src="/PRism.svg"
+            alt="PRism Logo"
+            width={36}
+            height={36}
+            style={{
+              objectFit: 'contain',
+              filter: 'brightness(1.3) contrast(1.1) drop-shadow(0 0 8px rgba(192, 132, 252, 0.4))',
+            }}
+            priority
+          />
         </div>
         <div style={{ fontSize: '13px', color: 'var(--text)', opacity: 0.7 }}>
           Initializing PRism...
@@ -62,21 +71,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div style={{ maxWidth: '640px', width: '100%' }}>
           <div
             style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)',
+              width: '68px',
+              height: '68px',
+              borderRadius: '18px',
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(99, 65, 202, 0.28) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.4)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '28px',
               marginBottom: '24px',
-              boxShadow: '0 0 32px rgba(168, 85, 247, 0.4)',
+              boxShadow: '0 0 32px rgba(168, 85, 247, 0.35)',
             }}
           >
-            P
+            <Image
+              src="/PRism.svg"
+              alt="PRism Logo"
+              width={52}
+              height={52}
+              style={{
+                objectFit: 'contain',
+                filter: 'brightness(1.3) contrast(1.1) drop-shadow(0 0 10px rgba(192, 132, 252, 0.5))',
+              }}
+              priority
+            />
           </div>
 
           <h1

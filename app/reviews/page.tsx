@@ -41,7 +41,7 @@ export default function ReviewsListPage() {
         actions={
           <button
             onClick={() => refetch()}
-            className="prism-btn prism-btn-secondary"
+            className="prism-btn prism-btn-secondary prism-btn-sm"
             title="Refresh reviews list"
           >
             ↻ Refresh
@@ -49,7 +49,7 @@ export default function ReviewsListPage() {
         }
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {error && (
           <div
             style={{
@@ -66,22 +66,32 @@ export default function ReviewsListPage() {
         )}
 
         {/* Filters Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '3px',
+              borderRadius: '7px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              flexWrap: 'wrap',
+              gap: '2px',
+            }}
+          >
             {statuses.map((s) => (
               <button
                 key={s.value}
                 onClick={() => setStatusFilter(s.value)}
                 style={{
-                  padding: '7px 14px',
-                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '5px',
                   fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  backgroundColor: statusFilter === s.value ? 'var(--accent)' : 'var(--surface)',
-                  color: statusFilter === s.value ? '#ffffff' : 'var(--text)',
-                  border: statusFilter === s.value ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  transition: 'all 0.15s ease',
+                  backgroundColor: statusFilter === s.value ? 'var(--accent)' : 'transparent',
+                  color: statusFilter === s.value ? '#ffffff' : 'var(--text-muted)',
+                  border: 'none',
+                  transition: 'all 0.12s ease',
                 }}
               >
                 {s.label}
@@ -89,11 +99,11 @@ export default function ReviewsListPage() {
             ))}
           </div>
 
-          <div style={{ width: '280px' }}>
+          <div style={{ width: '260px' }}>
             <input
               type="text"
               className="prism-input"
-              placeholder="Search by repo or PR #..."
+              placeholder="Search repo or PR #..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -103,18 +113,18 @@ export default function ReviewsListPage() {
         {/* Reviews Table */}
         <div className="prism-card" style={{ padding: 0, overflow: 'hidden' }}>
           {loading ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
               Loading review history...
             </div>
           ) : filteredReviews.length === 0 ? (
-            <div style={{ padding: '56px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '15px', color: 'var(--text-h)', marginBottom: '6px' }}>
+            <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '14.5px', color: 'var(--text-h)', marginBottom: '4px', fontWeight: 600 }}>
                 No reviews found
               </div>
-              <div style={{ fontSize: '13px', maxWidth: '440px', margin: '0 auto 16px' }}>
-                PRism will automatically trigger multi-agent reviews whenever a pull request is opened or updated on a tracked repository.
+              <div style={{ fontSize: '12.5px', maxWidth: '440px', margin: '0 auto 14px' }}>
+                PRism automatically triggers multi-agent reviews whenever a pull request is opened or updated on a tracked repository.
               </div>
-              <Link href="/repositories" className="prism-btn prism-btn-primary">
+              <Link href="/repositories" className="prism-btn prism-btn-primary prism-btn-sm">
                 View Tracked Repositories →
               </Link>
             </div>
@@ -155,7 +165,9 @@ export default function ReviewsListPage() {
                       </Link>
                     </td>
                     <td>
-                      <code style={{ fontSize: '11px' }}>{rev.commitSha.substring(0, 7)}</code>
+                      <code style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                        {rev.commitSha?.substring(0, 7) || '—'}
+                      </code>
                     </td>
                     <td>
                       <StatusBadge type="review" value={rev.status} />
@@ -179,14 +191,13 @@ export default function ReviewsListPage() {
                     <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       {rev.durationMs ? `${(rev.durationMs / 1000).toFixed(1)}s` : '—'}
                     </td>
-                    <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <td style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {new Date(rev.createdAt).toLocaleDateString()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <Link
                         href={`/reviews/${rev.id}`}
-                        className="prism-btn prism-btn-secondary"
-                        style={{ fontSize: '11px', padding: '4px 10px' }}
+                        className="prism-btn prism-btn-secondary prism-btn-sm"
                       >
                         View Report →
                       </Link>

@@ -35,31 +35,31 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
 
   const getNodeBadgeColor = (nodeName: string) => {
     const lower = nodeName.toLowerCase();
-    if (lower.includes('security')) return { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171' };
-    if (lower.includes('critic') || lower.includes('verifier')) return { bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6' };
-    if (lower.includes('gate') || lower.includes('router')) return { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24' };
-    if (lower.includes('post') || lower.includes('github')) return { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399' };
-    if (lower.includes('specialist')) return { bg: 'rgba(168, 85, 247, 0.15)', text: '#c084fc' };
+    if (lower.includes('security')) return { bg: 'rgba(244, 63, 94, 0.12)', text: '#fb7185', border: 'rgba(244, 63, 94, 0.25)' };
+    if (lower.includes('critic') || lower.includes('verifier')) return { bg: 'rgba(236, 72, 153, 0.12)', text: '#f472b6', border: 'rgba(236, 72, 153, 0.25)' };
+    if (lower.includes('gate') || lower.includes('router')) return { bg: 'rgba(245, 158, 11, 0.12)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.25)' };
+    if (lower.includes('post') || lower.includes('github')) return { bg: 'rgba(16, 185, 129, 0.12)', text: '#34d399', border: 'rgba(16, 185, 129, 0.25)' };
+    if (lower.includes('specialist')) return { bg: 'rgba(168, 85, 247, 0.12)', text: '#c084fc', border: 'rgba(168, 85, 247, 0.25)' };
     if (lower.includes('context') || lower.includes('rag') || lower.includes('retriev'))
-      return { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8' };
-    return { bg: 'var(--surface-hover)', text: 'var(--text)' };
+      return { bg: 'rgba(56, 189, 248, 0.12)', text: '#38bdf8', border: 'rgba(56, 189, 248, 0.25)' };
+    return { bg: 'var(--surface-hover)', text: 'var(--text)', border: 'var(--border)' };
   };
 
   return (
-    <div style={{ position: 'relative', paddingLeft: '24px' }}>
+    <div style={{ position: 'relative', paddingLeft: '22px' }}>
       {/* Vertical Spine Line */}
       <div
         style={{
           position: 'absolute',
-          top: '8px',
+          top: '10px',
           bottom: '16px',
-          left: '9px',
+          left: '8px',
           width: '2px',
           backgroundColor: 'var(--border)',
         }}
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {events.map((event, idx) => {
           const badgeStyle = getNodeBadgeColor(event.nodeName);
           const isExpanded = expandedId === event.id;
@@ -80,14 +80,14 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
               <div
                 style={{
                   position: 'absolute',
-                  left: '-20px',
-                  top: '5px',
-                  width: '10px',
-                  height: '10px',
+                  left: '-19px',
+                  top: '8px',
+                  width: '9px',
+                  height: '9px',
                   borderRadius: '50%',
                   backgroundColor: badgeStyle.text,
                   border: '2px solid var(--surface)',
-                  boxShadow: `0 0 8px ${badgeStyle.text}55`,
+                  boxShadow: `0 0 6px ${badgeStyle.text}55`,
                 }}
               />
 
@@ -97,8 +97,8 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                   backgroundColor: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: '6px',
-                  padding: '12px 16px',
-                  fontSize: '13px',
+                  padding: '12px 14px',
+                  fontSize: '12.5px',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -109,6 +109,7 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                         borderRadius: '4px',
                         backgroundColor: badgeStyle.bg,
                         color: badgeStyle.text,
+                        border: `1px solid ${badgeStyle.border}`,
                         fontWeight: 600,
                         fontSize: '11px',
                         fontFamily: 'var(--mono)',
@@ -121,16 +122,34 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     {event.durationMs !== undefined && event.durationMs !== null && (
-                      <span title="Execution Latency">⏱ {event.durationMs.toFixed(0)} ms</span>
+                      <span
+                        style={{
+                          backgroundColor: 'var(--surface-hover)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontFamily: 'var(--mono)',
+                        }}
+                        title="Execution Latency"
+                      >
+                        ⏱ {event.durationMs.toFixed(0)}ms
+                      </span>
                     )}
                     {((event.tokensIn || 0) + (event.tokensOut || 0) > 0) && (
-                      <span title="Tokens consumed">
+                      <span
+                        style={{
+                          backgroundColor: 'var(--surface-hover)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontFamily: 'var(--mono)',
+                        }}
+                        title="Tokens consumed"
+                      >
                         ⚡ {(event.tokensIn || 0) + (event.tokensOut || 0)} tok
                       </span>
                     )}
-                    <span>{new Date(event.createdAt).toLocaleTimeString()}</span>
+                    <span>{new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                   </div>
                 </div>
 
@@ -149,9 +168,10 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
+                        fontWeight: 500,
                       }}
                     >
-                      <span>{isExpanded ? '▾ Hide Payload' : '▸ View Payload Telemetry'}</span>
+                      <span>{isExpanded ? '▾ Hide Raw Telemetry' : '▸ View Raw Telemetry'}</span>
                     </button>
 
                     {isExpanded && (
@@ -159,14 +179,15 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                         style={{
                           margin: '8px 0 0',
                           padding: '10px 12px',
-                          borderRadius: '4px',
+                          borderRadius: '5px',
                           backgroundColor: 'var(--code-bg)',
                           border: '1px solid var(--border)',
                           fontSize: '11px',
-                          lineHeight: 1.4,
+                          lineHeight: 1.45,
                           color: '#e2e8f0',
                           overflowX: 'auto',
                           maxHeight: '260px',
+                          fontFamily: 'var(--mono)',
                         }}
                       >
                         <code>{payloadStr}</code>

@@ -70,7 +70,7 @@ export default function DashboardPage() {
         actions={
           <button
             onClick={handleRefreshAll}
-            className="prism-btn prism-btn-secondary"
+            className="prism-btn prism-btn-secondary prism-btn-sm"
             title="Refresh dashboard metrics"
           >
             ↻ Refresh
@@ -78,7 +78,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Onboarding Banner if GitHub App not connected */}
         {!hasInstallation && <ConnectGitHubBanner />}
 
@@ -98,32 +98,32 @@ export default function DashboardPage() {
         )}
 
         {/* Top Metrics Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
           {/* Tracked Repos */}
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               TRACKED REPOSITORIES
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-h)' }}>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-h)', letterSpacing: '-0.02em' }}>
               {loading ? '—' : trackedCount}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
-              <span style={{ color: '#34d399' }}>{upToDateCount} up to date</span>
-              {indexingCount > 0 && <span style={{ color: '#fbbf24' }}>• {indexingCount} indexing</span>}
-              {needsReindexCount > 0 && <span style={{ color: '#fde047' }}>• {needsReindexCount} stale</span>}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+              <span style={{ color: '#34d399', fontWeight: 500 }}>● {upToDateCount} up to date</span>
+              {indexingCount > 0 && <span style={{ color: '#fbbf24', fontWeight: 500 }}>• {indexingCount} indexing</span>}
+              {needsReindexCount > 0 && <span style={{ color: '#fde047', fontWeight: 500 }}>• {needsReindexCount} stale</span>}
             </div>
           </div>
 
           {/* Active Reviews */}
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
               ACTIVE REVIEWS RUNNING
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: inProgressCount > 0 ? 'var(--accent-cyan)' : 'var(--text-h)' }}>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: inProgressCount > 0 ? 'var(--accent-cyan)' : 'var(--text-h)', letterSpacing: '-0.02em' }}>
               {loading ? '—' : inProgressCount}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {inProgressCount > 0 ? 'Autonomous swarm analyzing PRs' : 'No active review runs'}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {inProgressCount > 0 ? 'Autonomous agent swarm active' : 'No review runs in progress'}
             </div>
           </div>
 
@@ -131,41 +131,42 @@ export default function DashboardPage() {
           <div
             className="prism-card"
             style={{
+              padding: '16px 18px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: '6px',
               border: awaitingApprovalReviews.length > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border)',
-              backgroundColor: awaitingApprovalReviews.length > 0 ? 'rgba(245, 158, 11, 0.04)' : 'var(--surface)',
+              backgroundColor: awaitingApprovalReviews.length > 0 ? 'rgba(245, 158, 11, 0.04)' : 'var(--surface-card)',
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 600, color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-muted)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-muted)', letterSpacing: '0.04em' }}>
               HUMAN APPROVAL QUEUE
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-h)' }}>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-h)', letterSpacing: '-0.02em' }}>
               {loading ? '—' : awaitingApprovalReviews.length}
             </div>
-            <div style={{ fontSize: '11px', color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-muted)' }}>
-              {awaitingApprovalReviews.length > 0 ? 'Action required by developer' : 'All reviews posted or auto-cleared'}
+            <div style={{ fontSize: '11px', color: awaitingApprovalReviews.length > 0 ? '#fbbf24' : 'var(--text-muted)', marginTop: '2px' }}>
+              {awaitingApprovalReviews.length > 0 ? 'Action required by developer' : 'All reviews cleared'}
             </div>
           </div>
 
           {/* Codebase Q&A Quick Jump */}
-          <div className="prism-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div className="prism-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
                 KNOWLEDGE BASE
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-h)', marginTop: '6px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-h)', marginTop: '4px' }}>
                 Code Q&A Engine
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Ask architecture queries on indexed code
+                Chat with indexed codebases
               </div>
             </div>
             <Link
               href="/qa"
-              className="prism-btn prism-btn-secondary"
-              style={{ fontSize: '12px', padding: '6px 12px', marginTop: '10px', width: 'fit-content' }}
+              className="prism-btn prism-btn-secondary prism-btn-sm"
+              style={{ marginTop: '8px', width: 'fit-content' }}
             >
               Open Q&A →
             </Link>
@@ -176,28 +177,28 @@ export default function DashboardPage() {
         {awaitingApprovalReviews.length > 0 && (
           <div
             style={{
-              padding: '20px',
+              padding: '16px 20px',
               borderRadius: '8px',
-              backgroundColor: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.35)',
+              backgroundColor: 'rgba(245, 158, 11, 0.06)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
+              gap: '10px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px' }}>✋</span>
-                <h3 style={{ margin: 0, fontSize: '15px', color: '#fbbf24', fontWeight: 600 }}>
-                  Action Required: Reviews Awaiting Human Approval
+                <span style={{ fontSize: '15px' }}>✋</span>
+                <h3 style={{ margin: 0, fontSize: '14px', color: '#fbbf24', fontWeight: 600 }}>
+                  Action Required: Reviews Awaiting Human Approval ({awaitingApprovalReviews.length})
                 </h3>
               </div>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {awaitingApprovalReviews.length} review(s) paused by confidence gate
+              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                Confidence gate triggered
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {awaitingApprovalReviews.map((rev) => (
                 <div
                   key={rev.id}
@@ -205,45 +206,43 @@ export default function DashboardPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 16px',
+                    padding: '10px 14px',
                     borderRadius: '6px',
                     backgroundColor: 'var(--surface)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <StatusBadge type="review" value={rev.status} />
                     <div>
                       <Link
                         href={`/reviews/${rev.id}`}
                         style={{
                           fontWeight: 600,
-                          fontSize: '14px',
+                          fontSize: '13px',
                           color: 'var(--text-h)',
                           textDecoration: 'none',
                         }}
                       >
                         {rev.repoName} • PR #{rev.prNumber}
                       </Link>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {rev.findingsCount} critical or low-confidence finding(s) detected
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {rev.findingsCount} actionable finding(s) detected
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Link
                       href={`/reviews/${rev.id}`}
-                      className="prism-btn prism-btn-secondary"
-                      style={{ fontSize: '12px', padding: '6px 12px' }}
+                      className="prism-btn prism-btn-secondary prism-btn-sm"
                     >
                       Review Findings
                     </Link>
                     <button
                       onClick={() => handleQuickApprove(rev.id)}
                       disabled={approvingId === rev.id || approveReviewMutation.isPending}
-                      className="prism-btn prism-btn-primary"
-                      style={{ fontSize: '12px', padding: '6px 12px' }}
+                      className="prism-btn prism-btn-primary prism-btn-sm"
                     >
                       {approvingId === rev.id ? 'Posting...' : 'Approve & Post Review'}
                     </button>
@@ -255,27 +254,27 @@ export default function DashboardPage() {
         )}
 
         {/* Main 2-Column Split: Recent Reviews (Left) + Tracked Repositories (Right) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '18px', alignItems: 'start' }}>
           {/* Left Column: Recent Reviews */}
-          <div className="prism-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div className="prism-card" style={{ padding: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-h)' }}>Recent Reviews</h3>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Autonomous review executions triggered by GitHub pull requests
+                <h3 style={{ margin: 0, fontSize: '14.5px', color: 'var(--text-h)' }}>Recent Reviews</h3>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  Autonomous pull request reviews
                 </div>
               </div>
-              <Link href="/reviews" className="prism-btn prism-btn-secondary" style={{ fontSize: '11px', padding: '4px 10px' }}>
+              <Link href="/reviews" className="prism-btn prism-btn-secondary prism-btn-sm">
                 View all →
               </Link>
             </div>
 
             {loadingReviews && reviews.length === 0 ? (
-              <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 Loading reviews...
               </div>
             ) : reviews.length === 0 ? (
-              <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 No reviews recorded yet. PRism will automatically review pull requests on tracked repositories.
               </div>
             ) : (
@@ -301,8 +300,8 @@ export default function DashboardPage() {
                             textDecoration: 'none',
                           }}
                         >
-                          <span style={{ color: 'var(--text-muted)' }}>{rev.repoName}</span>
-                          <span style={{ color: 'var(--accent-cyan)', marginLeft: '6px' }}>#{rev.prNumber}</span>
+                          <span style={{ color: 'var(--text)' }}>{rev.repoName}</span>
+                          <span style={{ color: 'var(--accent-cyan)', marginLeft: '5px' }}>#{rev.prNumber}</span>
                         </Link>
                       </td>
                       <td>
@@ -316,7 +315,7 @@ export default function DashboardPage() {
                           {rev.findingsCount}
                         </span>
                       </td>
-                      <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      <td style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                         {new Date(rev.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
@@ -327,36 +326,36 @@ export default function DashboardPage() {
           </div>
 
           {/* Right Column: Tracked Repositories Status */}
-          <div className="prism-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div className="prism-card" style={{ padding: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-h)' }}>Tracked Repositories</h3>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Monitored for push & PR events
+                <h3 style={{ margin: 0, fontSize: '14.5px', color: 'var(--text-h)' }}>Tracked Repositories</h3>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  Monitored codebases
                 </div>
               </div>
-              <Link href="/repositories" className="prism-btn prism-btn-secondary" style={{ fontSize: '11px', padding: '4px 10px' }}>
+              <Link href="/repositories" className="prism-btn prism-btn-secondary prism-btn-sm">
                 Manage →
               </Link>
             </div>
 
             {loadingRepos && repositories.length === 0 ? (
-              <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 Loading repositories...
               </div>
             ) : repositories.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 <div>No repositories tracked yet.</div>
                 <Link
                   href="/repositories"
-                  className="prism-btn prism-btn-primary"
-                  style={{ marginTop: '12px', fontSize: '12px', padding: '6px 14px' }}
+                  className="prism-btn prism-btn-primary prism-btn-sm"
+                  style={{ marginTop: '10px' }}
                 >
                   Browse Available Repositories
                 </Link>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {repositories.slice(0, 6).map((repo) => (
                   <div
                     key={repo.id}
@@ -364,25 +363,31 @@ export default function DashboardPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       borderRadius: '6px',
                       backgroundColor: 'var(--surface-hover)',
-                      border: '1px solid var(--border)',
+                      border: '1px solid var(--border-subtle)',
+                      transition: 'border-color 0.12s ease',
                     }}
                   >
-                    <div>
+                    <div style={{ overflow: 'hidden', paddingRight: '8px' }}>
                       <Link
                         href={`/repositories/${repo.id}`}
                         style={{
                           fontWeight: 600,
-                          fontSize: '13px',
+                          fontSize: '12.5px',
                           color: 'var(--text-h)',
                           textDecoration: 'none',
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
+                        title={repo.fullName}
                       >
                         {repo.fullName}
                       </Link>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px' }}>
                         {repo.totalReviewRuns ?? 0} reviews • {repo.isPrivate ? 'Private' : 'Public'}
                       </div>
                     </div>
